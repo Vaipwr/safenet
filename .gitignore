@@ -6,3 +6,13 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+# NETRA runtime artefacts (regenerated at runtime)
+prahari/modules/netra/serial_store.db
+prahari/modules/netra/models/*.pt
+prahari/modules/netra/models/*.tflite

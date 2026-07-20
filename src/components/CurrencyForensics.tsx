@@ -11,24 +11,48 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
   const [selectedNote, setSelectedNote] = useState(SAMPLE_BANKNOTES[0]);
   const [analysisResult, setAnalysisResult] = useState<CurrencyAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Base64 of the user's uploaded image, kept so the "Run Inspection Verdict"
+  // button can re-analyse the upload instead of a name tag with no image.
+  const [uploadedB64, setUploadedB64] = useState<string | null>(null);
   const [activeHoverMark, setActiveHoverMark] = useState<any | null>(null);
 
+  // Reject responses that are missing the fields the UI renders, so a bad
+  // payload surfaces as a clear message instead of a blank panel or a crash.
+  const isValidAnalysis = (d: any): d is CurrencyAnalysis =>
+    d && Array.isArray(d.features) && Array.isArray(d.heatmapMarkings);
+
   const triggerVerification = async (noteId: string) => {
+    // A custom upload has no server-side sample file — it must be re-sent as an
+    // image. Guard against clicking Run before anything has been uploaded.
+    const isCustom = noteId === "custom_note";
+    if (isCustom && !uploadedB64) {
+      setErrorMsg("Please upload a note image first, then run the inspection.");
+      return;
+    }
+
     setIsLoading(true);
     setAnalysisResult(null);
+    setErrorMsg(null);
     onAddAuditLog(`Requested optical forensic analysis on Banknote [ID: ${noteId}]`);
 
     try {
+      const body = isCustom
+        ? { noteImageBase64: uploadedB64 }
+        : { selectedNoteId: noteId };
       const response = await fetch("/api/currency-detector", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ selectedNoteId: noteId }),
+        body: JSON.stringify(body),
       });
+      if (!response.ok) throw new Error(`Server responded ${response.status}`);
       const data = await response.json();
+      if (!isValidAnalysis(data)) throw new Error("Malformed analysis response");
       setAnalysisResult(data);
       onAddAuditLog(`Forensic scan completed for Serial No ${data.serialNo}. Verdict: ${data.isValid ? "Genuine" : "Counterfeit Warn"}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorMsg(`Analysis failed: ${err?.message || "request error"}. Is the NETRA backend running on port 8000?`);
       onAddAuditLog("Forensic scan error encountered.");
     } finally {
       setIsLoading(false);
@@ -40,17 +64,22 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
     if (file) {
       const reader = new FileReader();
       reader.onload = async () => {
+        const b64 = reader.result as string;
+        setUploadedB64(b64);
         setIsLoading(true);
         setAnalysisResult(null);
-        onAddAuditLog("Uploading custom currency note for OCR parsing...");
-        
+        setErrorMsg(null);
+        onAddAuditLog("Uploading custom currency note for forensic analysis...");
+
         try {
           const response = await fetch("/api/currency-detector", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ noteImageBase64: reader.result }),
           });
+          if (!response.ok) throw new Error(`Server responded ${response.status}`);
           const data = await response.json();
+          if (!isValidAnalysis(data)) throw new Error("Malformed analysis response");
           setAnalysisResult(data);
           setSelectedNote({
             id: "custom_note",
@@ -61,8 +90,9 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             description: `Serial Number detected: ${data.serialNo}`
           });
           onAddAuditLog(`Custom analysis finished. Serial Number: ${data.serialNo}`);
-        } catch (err) {
+        } catch (err: any) {
           console.error(err);
+          setErrorMsg(`Upload analysis failed: ${err?.message || "request error"}. Is the NETRA backend running on port 8000?`);
           onAddAuditLog("Custom upload inspection failed.");
         } finally {
           setIsLoading(false);
@@ -93,6 +123,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
                 onClick={() => {
                   setSelectedNote(note);
                   setAnalysisResult(null);
+                  setErrorMsg(null);
                 }}
                 className={`w-full text-left p-3 rounded-lg border transition-all ${
                   selectedNote.id === note.id
@@ -142,6 +173,16 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
           </button>
         </div>
 
+        {errorMsg && (
+          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-start gap-3" id="currency-error-banner">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-rose-400">Scan could not complete</p>
+              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{errorMsg}</p>
+            </div>
+          </div>
+        )}
+
         {analysisResult && (
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-verdict-summary">
             <h4 className="font-semibold text-xs text-slate-300 uppercase tracking-wider mb-3">Verification Verdict</h4>
@@ -187,42 +228,46 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
 
           {/* Interactive Bounding Box Stage */}
           <div className="relative border border-slate-800 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center p-4 min-h-[300px]">
-            <img
-              src={selectedNote.imageUrl}
-              alt="Rupee Note Specimen"
-              referrerPolicy="no-referrer"
-              className="max-h-[320px] rounded-lg object-contain select-none"
-            />
+            {/* Wrapper shrinks to the rendered image so overlay boxes are
+                positioned relative to the NOTE, not the letterboxed panel. */}
+            <div className="relative inline-block">
+              <img
+                src={selectedNote.imageUrl}
+                alt="Rupee Note Specimen"
+                referrerPolicy="no-referrer"
+                className="block max-h-[320px] w-auto rounded-lg object-contain select-none"
+              />
 
-            {/* Render analysis overlays if loaded */}
-            {analysisResult && analysisResult.heatmapMarkings.map((mark, index) => (
-              <div
-                key={index}
-                id={`landmark-box-${index}`}
-                onMouseEnter={() => setActiveHoverMark(mark)}
-                onMouseLeave={() => setActiveHoverMark(null)}
-                style={{
-                  left: `${mark.x}%`,
-                  top: `${mark.y}%`,
-                  width: `${mark.width}%`,
-                  height: `${mark.height}%`
-                }}
-                className={`absolute cursor-pointer border transition-all duration-300 ${
-                  activeHoverMark?.label === mark.label
-                    ? "bg-amber-500/10 border-amber-400 ring-2 ring-amber-400 shadow-lg"
-                    : mark.status === "valid"
-                      ? "border-emerald-500/60 hover:bg-emerald-500/10"
-                      : "border-rose-500/60 hover:bg-rose-500/10"
-                }`}
-              >
-                {/* Visual marker pin */}
-                <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full flex items-center justify-center font-mono text-[8px] font-bold text-slate-950 ${
-                  mark.status === "valid" ? "bg-emerald-400" : "bg-rose-400"
-                }`}>
-                  {index + 1}
+              {/* Render analysis overlays if loaded — % is relative to the image */}
+              {analysisResult && analysisResult.heatmapMarkings.map((mark, index) => (
+                <div
+                  key={index}
+                  id={`landmark-box-${index}`}
+                  onMouseEnter={() => setActiveHoverMark(mark)}
+                  onMouseLeave={() => setActiveHoverMark(null)}
+                  style={{
+                    left: `${mark.x}%`,
+                    top: `${mark.y}%`,
+                    width: `${mark.width}%`,
+                    height: `${mark.height}%`
+                  }}
+                  className={`absolute cursor-pointer border transition-all duration-300 ${
+                    activeHoverMark?.label === mark.label
+                      ? "bg-amber-500/10 border-amber-400 ring-2 ring-amber-400 shadow-lg"
+                      : mark.status === "valid"
+                        ? "border-emerald-500/60 hover:bg-emerald-500/10"
+                        : "border-rose-500/60 hover:bg-rose-500/10"
+                  }`}
+                >
+                  {/* Visual marker pin */}
+                  <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full flex items-center justify-center font-mono text-[8px] font-bold text-slate-950 ${
+                    mark.status === "valid" ? "bg-emerald-400" : "bg-rose-400"
+                  }`}>
+                    {index + 1}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
 
             {isLoading && (
               <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-slate-100 gap-3">

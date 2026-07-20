@@ -26,7 +26,8 @@ export const SAMPLE_BANKNOTES = [
     id: "genuine_500",
     name: "Rs 500 Note - Genuine RBI Tender",
     value: 500,
-    imageUrl: "https://images.unsplash.com/photo-1599508704512-2f19efd1e35f?q=80&w=600&auto=format&fit=crop",
+    // The exact image the NETRA CV backend analyses (served by server.ts).
+    imageUrl: "/samples/genuine_500.jpg",
     isValid: true,
     description: "Official Indian banknote featuring clear Mahatma Gandhi portrait, 3mm windowed security thread, and tactile intaglio markings."
   },
@@ -34,7 +35,7 @@ export const SAMPLE_BANKNOTES = [
     id: "counterfeit_500",
     name: "Rs 500 Note - Counterfeit Warning Pattern",
     value: 500,
-    imageUrl: "https://images.unsplash.com/photo-1627005753809-775bc1190ee3?q=80&w=600&auto=format&fit=crop",
+    imageUrl: "/samples/fake_500_photocopy.jpg",
     isValid: false,
     description: "Suspect note intercepted in regional retail checks. Fails multi-spectral fiber checks and security thread optical variable shift tests."
   }

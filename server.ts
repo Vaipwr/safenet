@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
@@ -8,6 +9,13 @@ dotenv.config();
 
 const app = express();
 app.use(express.json({ limit: "50mb" }));
+
+// Serve NETRA's real sample banknote images so the frontend can DISPLAY the
+// exact same image the CV backend ANALYSES (no more stock-photo mismatch).
+app.use(
+  "/samples",
+  express.static(path.join(process.cwd(), "prahari", "modules", "netra", "samples"))
+);
 
 const PORT = 3000;
 
@@ -31,6 +39,127 @@ if (API_KEY && API_KEY !== "MY_GEMINI_API_KEY") {
   }
 } else {
   console.log("GEMINI_API_KEY is not configured or placeholder. Running with simulated fallback analytics.");
+}
+
+// ==========================================
+// NETRA — Currency CV backend (Python / FastAPI) integration
+// ==========================================
+// The real counterfeit-currency analysis lives in the Python module at
+// prahari/modules/netra. This Express endpoint forwards the note image to it
+// and maps the returned PrahariEvent into the CurrencyAnalysis shape the React
+// frontend already expects. Start the backend with:
+//     cd prahari && .venv/Scripts/uvicorn app.main:app --port 8000
+const NETRA_API_URL = process.env.NETRA_API_URL || "http://127.0.0.1:8000";
+
+// Frontend sample-note IDs -> NETRA's on-disk sample images. Passing the real
+// filename lets NETRA's demo hint seed the canonical serial numbers.
+const NETRA_SAMPLE_FILES: Record<string, string> = {
+  genuine_500: "genuine_500.jpg",
+  counterfeit_500: "fake_500_photocopy.jpg",
+  fake_rbi_500: "fake_500_photocopy.jpg",
+};
+
+// Approximate on-note regions for each security feature, so the frontend can
+// draw a heatmap box per finding (x/y/width/height are % of the note image).
+const NETRA_ROI: Record<string, { x: number; y: number; width: number; height: number }> = {
+  ASPECT_RATIO:      { x: 25, y: 2,  width: 50, height: 6  },
+  PRINT_SHARPNESS:   { x: 60, y: 24, width: 30, height: 52 },
+  MICRO_LETTERING:   { x: 6,  y: 72, width: 24, height: 20 },
+  SECURITY_THREAD:   { x: 42, y: 8,  width: 5,  height: 84 },
+  COLOUR_PROFILE:    { x: 3,  y: 6,  width: 18, height: 24 },
+  SERIAL_FORMAT:     { x: 66, y: 76, width: 28, height: 16 },
+  SERIAL_RECURRENCE: { x: 66, y: 58, width: 28, height: 14 },
+};
+
+function netraFeatureStatus(passed: boolean | null): "PASS" | "FAIL" | "SUSPICIOUS" {
+  if (passed === true) return "PASS";
+  if (passed === false) return "FAIL";
+  return "SUSPICIOUS";
+}
+
+function netraMarkStatus(passed: boolean | null): "valid" | "suspicious" | "missing" {
+  if (passed === true) return "valid";
+  if (passed === false) return "suspicious";
+  return "missing";
+}
+
+// Map a PrahariEvent (from NETRA) into the CurrencyAnalysis shape.
+function mapPrahariToCurrency(event: any): any {
+  const findings: any[] = Array.isArray(event.findings) ? event.findings : [];
+  const verdict: string = event.verdict || "inconclusive";
+  const isValid = verdict === "genuine";
+  const serialNo = event?.raw?.serial || "UNREADABLE";
+  const risk = typeof event.risk_score === "number" ? event.risk_score : 0;
+
+  const heatmapMarkings = findings
+    .filter((f) => NETRA_ROI[f.code])
+    .map((f) => ({
+      ...NETRA_ROI[f.code],
+      label: f.label,
+      status: netraMarkStatus(f.passed),
+      description: f.detail || "",
+    }));
+
+  const features = findings.map((f) => ({
+    name: f.label,
+    status: netraFeatureStatus(f.passed),
+    detail: f.detail || "",
+  }));
+
+  const auditLog: string[] = [
+    `NETRA currency-CV engine ${event.model_version || ""} — source: ${event.source_module}`,
+    "Perspective rectification and denomination classification complete.",
+    ...findings.map(
+      (f) => `${f.label}: ${netraFeatureStatus(f.passed)} — ${f.detail}`
+    ),
+    `Serial OCR result: ${serialNo}`,
+    `Composite risk ${risk.toFixed(2)} (${event.risk_band}). Verdict: ${verdict.toUpperCase()}.`,
+    event.explanation || "",
+  ].filter(Boolean);
+
+  return {
+    serialNo,
+    isValid,
+    confidence: Math.max(1, Math.round((event.confidence || 0) * 100)),
+    mismatchReason: isValid ? "" : event.explanation || "Security features did not validate.",
+    heatmapMarkings,
+    features,
+    auditLog,
+  };
+}
+
+// Send a note image to NETRA and return the mapped CurrencyAnalysis, or null on failure.
+async function analyseWithNetra(
+  noteImageBase64?: string,
+  selectedNoteId?: string
+): Promise<any | null> {
+  let buf: Buffer | null = null;
+  let filename = "upload.jpg";
+
+  if (noteImageBase64) {
+    const clean = noteImageBase64.replace(/^data:image\/\w+;base64,/, "");
+    buf = Buffer.from(clean, "base64");
+  } else if (selectedNoteId && NETRA_SAMPLE_FILES[selectedNoteId]) {
+    filename = NETRA_SAMPLE_FILES[selectedNoteId];
+    const p = path.join(process.cwd(), "prahari", "modules", "netra", "samples", filename);
+    buf = fs.readFileSync(p);
+  }
+  if (!buf) return null;
+
+  const form = new FormData();
+  form.append("image", new Blob([buf as any]), filename);
+  form.append("district", "Demo District");
+
+  const resp = await fetch(`${NETRA_API_URL}/api/netra/scan`, {
+    method: "POST",
+    body: form as any,
+  });
+  if (!resp.ok) {
+    console.error(`NETRA backend returned HTTP ${resp.status}`);
+    return null;
+  }
+  const event = await resp.json();
+  return mapPrahariToCurrency(event);
 }
 
 // ==========================================
@@ -222,6 +351,17 @@ Transcript:
 app.post("/api/currency-detector", async (req, res) => {
   const { noteImageBase64, selectedNoteId } = req.body;
 
+  // 0. PRIMARY: real NETRA computer-vision backend (Python / FastAPI).
+  //    Falls through to the Gemini / simulated paths below if it is unreachable.
+  try {
+    const netraResult = await analyseWithNetra(noteImageBase64, selectedNoteId);
+    if (netraResult) {
+      return res.json(netraResult);
+    }
+  } catch (err: any) {
+    console.error("NETRA backend unreachable, falling back:", err?.message || err);
+  }
+
   // 1. If Gemini is available, we perform multimodal analysis
   if (ai && noteImageBase64) {
     try {
@@ -306,64 +446,20 @@ Provide a detailed forensic verification breakdown in the exact structured JSON 
     }
   }
 
-  // 2. High-fidelity Simulated Response based on sample selectedNoteId
-  // This allows the app to fully shine even without an image upload or if key is inactive
-  let result = {
-    serialNo: "7DF 293812",
-    isValid: true,
-    confidence: 98,
-    mismatchReason: "",
-    heatmapMarkings: [
-      { x: 74, y: 35, width: 14, height: 45, label: "Mahatma Gandhi Watermark", status: "valid", description: "Clear, multi-toned portrait matching RBI dies. Intricate micro-shading present." },
-      { x: 44, y: 15, width: 4, height: 70, label: "Security Thread", status: "valid", description: "Color shift visible from green to blue under direct angle. Demetalised 'RBI' and 'भारत' perfectly readable." },
-      { x: 12, y: 22, width: 15, height: 16, label: "See-through Register", status: "valid", description: "The floral design on front and back registers perfectly when held against light." },
-      { x: 80, y: 78, width: 10, height: 12, label: "Ashoka Pillar Emblem", status: "valid", description: "High-relief intaglio ink raises Ashoka symbol nicely. Intact geometric styling." }
-    ],
-    features: [
-      { name: "Watermark Window", status: "PASS", detail: "RBI-standard multi-toned watermark profile matches fully." },
-      { name: "Security Thread", status: "PASS", detail: "Correct 3mm windowed thread with perfect text alignment and blue/green color shift." },
-      { name: "Bleed Lines (Intaglio)", status: "PASS", detail: "5 angular bleed lines raise appropriately on tactile inspection (genuine Rs 500 feature)." },
-      { name: "Micro-lettering", status: "PASS", detail: "The word 'RBI' and '500' legible under 10x digital zoom." }
-    ],
-    auditLog: [
-      "Tactile surface response scanner initialized...",
-      "Watermark region segmented with multi-spectral overlay...",
-      "Aqueous security thread fluorescent profile calibrated: PASS",
-      "Ashoka Pillar geometric alignment score: 99.4%",
-      "Serial number extracted via OCR optical validation: 7DF 293812",
-      "No counterfeit indicators found. Note confirmed genuine RBI issued tender."
-    ]
-  };
-
-  if (selectedNoteId === "counterfeit_500" || selectedNoteId === "fake_rbi_500") {
-    result = {
-      serialNo: "3BC 100489",
-      isValid: false,
-      confidence: 94,
-      mismatchReason: "Suspicious security thread color shift & missing micro-lettering",
-      heatmapMarkings: [
-        { x: 74, y: 35, width: 14, height: 45, label: "Watermark Window", status: "suspicious", description: "Crude, flat printed portrait. Missing the RBI 3D watermarking gradient depth." },
-        { x: 44, y: 15, width: 4, height: 70, label: "Security Thread", status: "suspicious", description: "Thread has been drawn with silver ink. No optical shift from green to blue when tilted." },
-        { x: 12, y: 22, width: 15, height: 16, label: "See-through Register", status: "missing", description: "Misaligned registration lines. Elements from reverse do not match obverse pattern." },
-        { x: 80, y: 78, width: 10, height: 12, label: "Ashoka Pillar Emblem", status: "suspicious", description: "Lacks intaglio tactile feedback. Appears to be standard cheap laser print." }
-      ],
-      features: [
-        { name: "Watermark Window", status: "SUSPICIOUS", detail: "Watermark is screen-printed instead of embedded during paper manufacturing." },
-        { name: "Security Thread", status: "FAIL", detail: "Thread fails optical variable test (no green-to-blue shift). Pure static grey foil print." },
-        { name: "Bleed Lines (Intaglio)", status: "FAIL", detail: "No tactile ink elevation detected. Note is entirely flat." },
-        { name: "Micro-lettering", status: "FAIL", detail: "Text 'RBI' under Ashoka emblem is completely blurred and illegible." }
-      ],
-      auditLog: [
-        "Tactile grid scan failed: surface is abnormally smooth...",
-        "Watermark profile segmented: identified artificial superficial print overlay",
-        "Aqueous thread spectral test failed: no fluorescence detected",
-        "Ashoka pillar ink index: flat laser carbon deposition",
-        "WARNING: Counterfeit counterfeit markers detected in multiple high-security regions."
-      ]
-    };
-  }
-
-  res.json(result);
+  // 2. No fake fallback. If we get here, the real NETRA engine could not be
+  //    reached (and no Gemini key is configured). Returning a hardcoded
+  //    "98% genuine" here is exactly what made a fake note look authentic, so
+  //    we now fail honestly and let the UI show a clear error instead.
+  console.error(
+    "currency-detector: NETRA backend did not return a result. " +
+    `Check that it is running at ${NETRA_API_URL}. Refusing to send mock data.`
+  );
+  return res.status(503).json({
+    error: "analysis_engine_unavailable",
+    message:
+      "The NETRA analysis engine is not reachable, so no verdict can be produced. " +
+      `Start the Python backend (uvicorn on port 8000) and try again.`,
+  });
 });
 
 // ==========================================
