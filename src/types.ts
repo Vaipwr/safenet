@@ -63,6 +63,10 @@ export interface ScamCallAnalysis {
 export interface CurrencyAnalysis {
   serialNo: string;
   isValid: boolean;
+  /** False when the uploaded image is not a banknote at all (presence gate). */
+  isBanknote?: boolean;
+  /** Raw NETRA verdict: "genuine" | "suspect" | "inconclusive". */
+  verdict?: string;
   confidence: number;
   mismatchReason?: string;
   heatmapMarkings: {

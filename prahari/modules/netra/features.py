@@ -24,11 +24,13 @@ def check_aspect_ratio(measured_ratio: float, denomination: str) -> Finding:
     expected = ASPECT_RATIOS[denomination]
     # Calculate percentage deviation
     deviation = abs(measured_ratio - expected) / expected
-    passed = deviation < 0.04  # 4% tolerance
-    
+    # 8% tolerance. The old 4% assumed a perfectly rectified scan and failed
+    # real hand-held photos (a genuine ₹500 measured 2.39 vs 2.27 = 5.1%),
+    # where residual perspective easily costs several percent.
+    passed = deviation < 0.08
+
     # Map deviation to a score from 0 (poor) to 1 (perfect)
-    # 0 deviation = 1.0 score, 0.08 deviation = 0.0 score
-    score = max(0.0, min(1.0, 1.0 - (deviation / 0.08)))
+    score = max(0.0, min(1.0, 1.0 - (deviation / 0.16)))
     
     detail = (
         f"Passed - Measured ratio {measured_ratio:.2f} matches expected {expected:.2f} within threshold."
@@ -90,9 +92,12 @@ def check_micro_lettering(img: np.ndarray) -> Finding:
     edges = cv2.Canny(gray, 30, 100)
     edge_density = np.sum(edges > 0) / float(edges.size)
     
-    # Clean prints retain sharp structured edges. Photocopies blur micro-letters into high-density blobs.
-    # Expected edge density range for structured text is around 0.02 to 0.12
-    passed = 0.01 < edge_density < 0.15
+    # Clean prints retain sharp structured edges. Photocopies blur micro-letters
+    # into a solid low-density smear.
+    # Upper bound raised from 0.15: that ceiling was set against the synthetic
+    # sample drawings, and real intaglio engraving is far denser (genuine notes
+    # measure 0.18-0.23), so every real note was being failed here.
+    passed = 0.01 < edge_density < 0.35
     score = 1.0 if passed else 0.2
     
     detail = (
@@ -185,7 +190,19 @@ def check_serial_format(serial: str) -> Finding:
     
     clean_serial = serial.strip().replace(" ", "").upper()
     pattern = r"^[0-9A-Z]{3}[0-9]{6}$"
-    
+
+    # An unread serial is missing evidence, not evidence of forgery. Failing it
+    # outright pushed genuine notes toward SUSPECT whenever the ornate serial
+    # font defeated OCR, so it is scored neutrally instead.
+    if not clean_serial:
+        return Finding(
+            code=code,
+            label=label,
+            passed=None,
+            score=0.5,
+            detail="Inconclusive - the serial number could not be read from this image.",
+        )
+
     passed = bool(re.match(pattern, clean_serial))
     score = 1.0 if passed else 0.0
     

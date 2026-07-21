@@ -63,7 +63,8 @@ const NETRA_SAMPLE_FILES: Record<string, string> = {
 // Approximate on-note regions for each security feature, so the frontend can
 // draw a heatmap box per finding (x/y/width/height are % of the note image).
 const NETRA_ROI: Record<string, { x: number; y: number; width: number; height: number }> = {
-  ASPECT_RATIO:      { x: 25, y: 2,  width: 50, height: 6  },
+  NOTE_PRESENCE:     { x: 1,  y: 1,  width: 98, height: 98 },
+  ASPECT_RATIO:    { x: 25, y: 2,  width: 50, height: 6  },
   PRINT_SHARPNESS:   { x: 60, y: 24, width: 30, height: 52 },
   MICRO_LETTERING:   { x: 6,  y: 72, width: 24, height: 20 },
   SECURITY_THREAD:   { x: 42, y: 8,  width: 5,  height: 84 },
@@ -89,7 +90,10 @@ function mapPrahariToCurrency(event: any): any {
   const findings: any[] = Array.isArray(event.findings) ? event.findings : [];
   const verdict: string = event.verdict || "inconclusive";
   const isValid = verdict === "genuine";
-  const serialNo = event?.raw?.serial || "UNREADABLE";
+  // The gate rejected the image outright — it isn't a banknote, so there is no
+  // serial and no security-feature verdict to report.
+  const isBanknote = event?.raw?.is_banknote !== false;
+  const serialNo = isBanknote ? event?.raw?.serial || "UNREADABLE" : "N/A";
   const risk = typeof event.risk_score === "number" ? event.risk_score : 0;
 
   const heatmapMarkings = findings
@@ -113,7 +117,12 @@ function mapPrahariToCurrency(event: any): any {
     ...findings.map(
       (f) => `${f.label}: ${netraFeatureStatus(f.passed)} — ${f.detail}`
     ),
-    `Serial OCR result: ${serialNo}`,
+    // Naming the reader matters: a serial read by the cloud model and one read
+    // offline carry different reliability, and an analyst must be able to tell.
+    `Serial OCR result: ${serialNo}` +
+      (event?.raw?.serial_source && event.raw.serial_source !== "none"
+        ? ` (read by: ${event.raw.serial_source})`
+        : " (could not be read)"),
     `Composite risk ${risk.toFixed(2)} (${event.risk_band}). Verdict: ${verdict.toUpperCase()}.`,
     event.explanation || "",
   ].filter(Boolean);
@@ -121,6 +130,8 @@ function mapPrahariToCurrency(event: any): any {
   return {
     serialNo,
     isValid,
+    isBanknote,
+    verdict,
     confidence: Math.max(1, Math.round((event.confidence || 0) * 100)),
     mismatchReason: isValid ? "" : event.explanation || "Security features did not validate.",
     heatmapMarkings,

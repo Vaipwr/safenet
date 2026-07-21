@@ -105,26 +105,26 @@ export default function AISecurityAssistant() {
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="ai-assistant-root">
       {/* Sidebar Analysis Pane */}
       <div className="lg:col-span-4 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="ai-risk-pane">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="ai-risk-pane">
           <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert className="w-5 h-5 text-amber-400" />
-            <h3 className="font-semibold text-slate-100">AI Inquiry Profiling</h3>
+            <ShieldAlert className="w-5 h-5 text-[var(--color-navy)]" />
+            <h3 className="font-semibold text-[var(--color-ink)]">AI Inquiry Profiling</h3>
           </div>
-          <p className="text-xs text-slate-400 mb-4">
+          <p className="text-xs text-[var(--color-ink-2)] mb-4">
             Our real-time analyzer parses active questions to identify critical malware signatures or known financial phishing templates.
           </p>
 
-          <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-4">
+          <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-4 space-y-4">
             <div>
-              <span className="text-[10px] font-mono text-slate-500 uppercase block mb-1">Thread Threat Index</span>
+              <span className="text-[10px] font-mono text-[var(--color-ink-3)] uppercase block mb-1">Thread Threat Index</span>
               <div className="flex items-center gap-3">
-                <span className="text-3xl font-extrabold font-mono text-slate-200">{activeAnalysis.riskRating}%</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
+                <span className="text-3xl font-semibold font-mono text-[var(--color-ink)]">{activeAnalysis.riskRating}%</span>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded font-mono ${
                   activeAnalysis.riskLabel === "CRITICAL" || activeAnalysis.riskLabel === "HIGH"
-                    ? "bg-rose-500/10 text-rose-400"
+                    ? "bg-[var(--color-critical-tint)] text-[var(--color-critical)]"
                     : activeAnalysis.riskLabel === "SAFE"
-                      ? "bg-emerald-500/10 text-emerald-400"
-                      : "bg-slate-800 text-slate-400"
+                      ? "bg-[var(--color-safe-tint)] text-[var(--color-safe)]"
+                      : "bg-[var(--color-surface-2)] text-[var(--color-ink-2)]"
                 }`}>
                   {activeAnalysis.riskLabel} RISK
                 </span>
@@ -132,58 +132,58 @@ export default function AISecurityAssistant() {
             </div>
 
             <div>
-              <span className="text-[10px] font-mono text-slate-500 uppercase block mb-1.5">Detected Deception Vectors</span>
+              <span className="text-[10px] font-mono text-[var(--color-ink-3)] uppercase block mb-1.5">Detected Deception Vectors</span>
               {activeAnalysis.vectors.length > 0 ? (
                 <div className="space-y-1.5">
                   {activeAnalysis.vectors.map((vec, idx) => (
-                    <div key={idx} className="flex items-center gap-1.5 text-xs text-slate-300">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <div key={idx} className="flex items-center gap-1.5 text-xs text-[var(--color-ink-2)]">
+                      <AlertTriangle className="w-3.5 h-3.5 text-[var(--color-navy)] shrink-0" />
                       <span>{vec}</span>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500 italic">Initiate conversation to populate security parameters...</p>
+                <p className="text-xs text-[var(--color-ink-3)] italic">Initiate conversation to populate security parameters...</p>
               )}
             </div>
           </div>
         </div>
 
         {/* National Helplines */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="helpline-reference-card">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="helpline-reference-card">
           <div className="flex items-center gap-2 mb-3">
-            <Globe className="w-5 h-5 text-emerald-400" />
-            <h4 className="font-semibold text-xs text-slate-200 uppercase tracking-wider">CERT-In Directory Reference</h4>
+            <Globe className="w-5 h-5 text-[var(--color-safe)]" />
+            <h4 className="font-semibold text-xs text-[var(--color-ink)] uppercase tracking-wider">CERT-In Directory Reference</h4>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed mb-3">
+          <p className="text-xs text-[var(--color-ink-2)] leading-relaxed mb-3">
             Indian citizens who are active victims of banking fraud must file immediate report procedures.
           </p>
           <div className="space-y-2 text-xs" id="national-emergency-box">
-            <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
-              <span className="text-slate-300 font-semibold">National Cyber Helpline</span>
-              <span className="font-mono text-rose-400 font-bold text-sm">1930</span>
+            <div className="p-2.5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] flex justify-between items-center">
+              <span className="text-[var(--color-ink-2)] font-semibold">National Cyber Helpline</span>
+              <span className="font-mono text-[var(--color-critical)] font-semibold text-sm">1930</span>
             </div>
-            <div className="p-2.5 bg-slate-950 border border-slate-800 rounded-lg flex justify-between items-center">
-              <span className="text-slate-300 font-semibold">Government Cyber Portal</span>
-              <span className="font-mono text-emerald-400 font-bold">cybercrime.gov.in</span>
+            <div className="p-2.5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] flex justify-between items-center">
+              <span className="text-[var(--color-ink-2)] font-semibold">Government Cyber Portal</span>
+              <span className="font-mono text-[var(--color-safe)] font-semibold">cybercrime.gov.in</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Chat Stream Container */}
-      <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-xl flex flex-col h-[520px]" id="ai-chat-canvas">
+      <div className="lg:col-span-8 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] flex flex-col h-[520px]" id="ai-chat-canvas">
         {/* Header bar */}
-        <div className="border-b border-slate-800 p-4 flex justify-between items-center">
+        <div className="border-b border-[var(--color-line)] p-4 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <Brain className="w-5 h-5 text-purple-400" />
+            <Brain className="w-5 h-5 text-[var(--color-navy)]" />
             <div>
-              <h4 className="text-xs font-bold text-slate-200">SafeNet AI Cyber Intelligence Agent</h4>
-              <p className="text-[10px] text-slate-500">Secured CERT-In Sandbox Session</p>
+              <h4 className="text-xs font-semibold text-[var(--color-ink)]">SafeNet AI Cyber Intelligence Agent</h4>
+              <p className="text-[10px] text-[var(--color-ink-3)]">Secured CERT-In Sandbox Session</p>
             </div>
           </div>
-          <div className="flex items-center gap-1 bg-purple-500/10 text-purple-400 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider font-mono">
-            <Sparkles className="w-3 h-3 animate-pulse" />
+          <div className="flex items-center gap-1 bg-[var(--color-navy-tint)] text-[var(--color-navy)] text-[10px] px-2 py-0.5 rounded font-semibold uppercase tracking-wider font-mono">
+            <Sparkles className="w-3 h-3" />
             <span>Gemini v3.5 Active</span>
           </div>
         </div>
@@ -195,10 +195,10 @@ export default function AISecurityAssistant() {
               key={msg.id}
               className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
             >
-              <div className={`max-w-[80%] rounded-xl p-3.5 text-xs leading-relaxed ${
+              <div className={`max-w-[80%] rounded-[3px] p-3.5 text-xs leading-relaxed ${
                 msg.sender === "user"
-                  ? "bg-purple-600/20 border border-purple-500/30 text-slate-200"
-                  : "bg-slate-950 border border-slate-800 text-slate-300"
+                  ? "bg-purple-600/20 border border-purple-500/30 text-[var(--color-ink)]"
+                  : "bg-[var(--color-paper)] border border-[var(--color-line)] text-[var(--color-ink-2)]"
               }`}>
                 {msg.text}
               </div>
@@ -207,7 +207,7 @@ export default function AISecurityAssistant() {
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-500 flex items-center gap-2">
+              <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3 text-xs text-[var(--color-ink-3)] flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "0ms" }} />
                 <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "150ms" }} />
                 <span className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: "300ms" }} />
@@ -219,20 +219,20 @@ export default function AISecurityAssistant() {
         </div>
 
         {/* Message Input Form */}
-        <form onSubmit={handleSendMessage} className="border-t border-slate-800 p-4 flex gap-3" id="ai-chat-input-form">
+        <form onSubmit={handleSendMessage} className="border-t border-[var(--color-line)] p-4 flex gap-3" id="ai-chat-input-form">
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             disabled={isLoading}
             placeholder="Type your inquiry here (e.g. 'How do I report a fraudulent UPI transaction?')..."
-            className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-slate-200 outline-none focus:border-purple-500/50"
+            className="flex-1 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] px-4 py-2.5 text-xs text-[var(--color-ink)] outline-none focus:border-purple-500/50"
           />
           <button
             type="submit"
             id="send-message-btn"
             disabled={isLoading || !inputText.trim()}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-800 text-slate-100 disabled:text-slate-600 font-semibold rounded-lg text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-[var(--color-surface-2)] text-[var(--color-ink)] disabled:text-[var(--color-ink-3)] font-semibold rounded-[3px] text-xs transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Consult</span>

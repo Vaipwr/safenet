@@ -43,31 +43,31 @@ export function NetworkCanvas({ nodes, edges, selectedNodeId, fraudRingsCount = 
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4 flex flex-col justify-between shadow-xl" id="network-visualizer-canvas">
+    <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5 space-y-4 flex flex-col justify-between" id="network-visualizer-canvas">
       {/* Canvas Header & Status Widget */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-        <h3 className="font-bold text-slate-100 flex items-center gap-2 text-sm">
-          <Activity className="w-4.5 h-4.5 text-emerald-400" />
+        <h3 className="font-semibold text-[var(--color-ink)] flex items-center gap-2 text-sm">
+          <Activity className="w-4.5 h-4.5 text-[var(--color-safe)]" />
           <span>Interactive Money Trail Topology</span>
         </h3>
 
         {/* Network Status Widget */}
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-full text-xs font-mono text-slate-300 shadow-inner">
-          <span className="flex items-center gap-1.5 text-emerald-400 font-bold">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-full text-xs font-mono text-[var(--color-ink-2)]">
+          <span className="flex items-center gap-1.5 text-[var(--color-safe)] font-semibold">
+            <span className="w-2 h-2 rounded-full bg-[var(--color-safe)]" />
             <span>Connected</span>
           </span>
-          <span className="text-slate-700">|</span>
+          <span className="text-[var(--color-ink-3)]">|</span>
           <span className="font-semibold">{nodes.length} Nodes</span>
-          <span className="text-slate-700">|</span>
+          <span className="text-[var(--color-ink-3)]">|</span>
           <span className="font-semibold">{edges.length} Edges</span>
-          <span className="text-slate-700">|</span>
-          <span className="text-rose-400 font-bold">{fraudRingsCount} Rings</span>
+          <span className="text-[var(--color-ink-3)]">|</span>
+          <span className="text-[var(--color-critical)] font-semibold">{fraudRingsCount} Rings</span>
         </div>
       </div>
 
       {/* SVG Canvas Stage */}
-      <div className="relative bg-slate-950 border border-slate-800 rounded-xl p-4 overflow-hidden min-h-[430px] flex items-center justify-center">
+      <div className="relative bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-4 overflow-hidden min-h-[430px] flex items-center justify-center">
         <svg className="w-full h-[400px]" viewBox="0 0 400 310">
           {/* Draw Edges */}
           {edges.map((edge, idx) => {
@@ -202,7 +202,7 @@ export function NetworkCanvas({ nodes, edges, selectedNodeId, fraudRingsCount = 
                   fill={nodeColor}
                   opacity={node.isFrozen ? 0.45 : nodeOpacity}
                   className={`transition-all duration-300 ${
-                    isSelected ? "stroke-slate-100 stroke-2" : "group-hover:stroke-slate-200 group-hover:stroke-2"
+                    isSelected ? "stroke-[#1b1a17] stroke-2" : "group-hover:stroke-[#4a4842] group-hover:stroke-2"
                   }`}
                 />
 
@@ -253,27 +253,27 @@ export function NetworkCanvas({ nodes, edges, selectedNodeId, fraudRingsCount = 
         </svg>
 
         {/* Clean Floating Legend */}
-        <div className="absolute bottom-3 left-3 bg-slate-900/95 border border-slate-800 rounded-xl p-3 text-xs font-mono text-slate-200 space-y-1.5 backdrop-blur-md shadow-2xl">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Entity Legend</div>
+        <div className="absolute bottom-3 left-3 bg-[var(--color-surface)] border border-[var(--color-line)] rounded-[3px] p-3 text-xs font-mono text-[var(--color-ink)] space-y-1.5">
+          <div className="text-[10px] font-semibold text-[var(--color-ink-2)] uppercase tracking-wider mb-1">Entity Legend</div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-rose-500 shadow-sm" />
-            <span className="font-semibold text-slate-200">🔴 Scammer</span>
+            <span className="w-3 h-3 rounded-full bg-[var(--color-critical)] shadow-sm" />
+            <span className="font-semibold text-[var(--color-ink)]">🔴 Scammer</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-amber-400 shadow-sm" />
-            <span className="font-semibold text-slate-200">🟡 Mule</span>
+            <span className="w-3 h-3 rounded-full bg-[var(--color-medium)] shadow-sm" />
+            <span className="font-semibold text-[var(--color-ink)]">🟡 Mule</span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-3 h-3 rounded-full bg-emerald-400 shadow-sm" />
-            <span className="font-semibold text-slate-200">🟢 UPI</span>
+            <span className="w-3 h-3 rounded-full bg-[var(--color-safe)] shadow-sm" />
+            <span className="font-semibold text-[var(--color-ink)]">🟢 UPI</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-purple-400 shadow-sm" />
-            <span className="font-semibold text-slate-200">🟣 Device</span>
+            <span className="font-semibold text-[var(--color-ink)]">🟣 Device</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-400 shadow-sm" />
-            <span className="font-semibold text-slate-200">🔵 Phone</span>
+            <span className="font-semibold text-[var(--color-ink)]">🔵 Phone</span>
           </div>
         </div>
       </div>

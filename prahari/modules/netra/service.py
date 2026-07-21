@@ -15,6 +15,20 @@ from modules.netra import classifier
 from modules.netra import features
 from modules.netra import ocr
 from modules.netra import serial_store
+from modules.netra import note_gate
+from modules.netra import quality
+from modules.netra import vision_api
+
+def _verdict_confidence(image: float, note_presence: float, denomination: float) -> float:
+    """Blend the independent confidence signals into one reportable figure.
+
+    Weighted mean rather than a product: each term answers a different question
+    (was the image legible / is it a note / do we know the denomination), and a
+    weak answer to one should lower confidence, not annihilate it.
+    """
+    score = 0.4 * image + 0.4 * note_presence + 0.2 * denomination
+    return float(min(0.99, max(0.05, score)))
+
 
 def process_note_scan(
     image_bytes: bytes,
@@ -50,17 +64,91 @@ def process_note_scan(
             evidence=[evidence]
         )
 
-    # 3. Denomination Classification
-    denomination, class_confidence = classifier.classify_denomination(rectified_img)
+    # 2b. Gate: is this a banknote at all? Every audit below assumes it is, so
+    #     a non-note image must be rejected here rather than scored as a note.
+    original_img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    note_ok, likeness, gate_parts, gate_reason = note_gate.is_banknote(
+        rectified_img, measured_ratio, rectify_confidence, original=original_img
+    )
+    gate_finding = Finding(
+        code="NOTE_PRESENCE",
+        label="Banknote Presence Check",
+        passed=note_ok,
+        score=likeness,
+        detail=(
+            f"Passed - Image recognised as a banknote (likeness {likeness:.2f})."
+            if note_ok
+            else f"Failed - No banknote detected (likeness {likeness:.2f}): {gate_reason}."
+        ),
+    )
+    if not note_ok:
+        return PrahariEvent(
+            source_module=SourceModule.NETRA,
+            risk_score=0.0,
+            risk_band=RiskBand.LOW,
+            confidence=1.0 - likeness,
+            verdict=Verdict.INCONCLUSIVE,
+            findings=[gate_finding],
+            evidence=[evidence],
+            model_version="v1.0.0",
+            explanation=(
+                "Not a banknote - this image does not appear to contain an Indian "
+                f"currency note ({gate_reason}). Please upload a flat, well-lit photo "
+                "of the note filling most of the frame."
+            ),
+            raw={"is_banknote": False, "banknote_likeness": likeness, "gate": gate_parts},
+        )
+
+    # 3. Read the note's text once, then classify the denomination from the
+    #    printed numeral (falling back to the colour heuristic if unreadable).
+    #    Cloud first (if a key is configured), local OCR as the fallback. Only
+    #    the *readings* are outsourced — the verdict below stays local.
+    cloud = vision_api.read_note(rectified_img)
+    cloud_serial = cloud_denom = None
+    cloud_confidence = 0.0
+    if cloud:
+        cloud_serial, cloud_denom, cloud_confidence = cloud
+
+    # Skip the local OCR pass entirely when the cloud already returned both
+    # readings — running EasyOCR anyway just to discard its output added ~3s to
+    # every scan. It still runs whenever the cloud is off or came back partial.
+    ocr_texts = [] if (cloud_serial and cloud_denom) else ocr.read_texts(rectified_img)
+    denomination, class_confidence = classifier.classify_denomination(rectified_img, ocr_texts)
+    if cloud_denom:
+        denomination, class_confidence = cloud_denom, max(class_confidence, cloud_confidence, 0.9)
+    if denomination == "none":
+        # Retry with the numeral-targeted crops before giving up on the value.
+        digit_texts = ocr.read_denomination_digits(rectified_img)
+        if digit_texts:
+            denomination, class_confidence = classifier.classify_denomination(
+                rectified_img, digit_texts
+            )
     
+    # 3b. Is the image usable enough to judge at all?
+    usability, quality_reason = quality.assess(rectified_img)
+    image_is_soft = quality.is_soft(rectified_img)
+
     # 4. Serial Number OCR
-    serial_no, ocr_confidence = ocr.extract_serial_number(rectified_img, filename_hint)
+    # Prefer a serial matching the RBI format found anywhere in the text pass;
+    # fall back to the fixed bottom-right crop when nothing matches.
+    serial_source = "none"
+    if cloud_serial:
+        serial_no, ocr_confidence = cloud_serial, max(cloud_confidence, 0.5)
+        serial_source = "gemini"
+    else:
+        serial_no, ocr_confidence = ocr.serial_from_texts(ocr_texts)
+        if not serial_no:
+            serial_no, ocr_confidence = ocr.extract_serial_number(rectified_img, filename_hint)
+        if serial_no:
+            serial_source = "easyocr"
     norm_serial = normalise_serial(serial_no)
 
     # 5. Execute the six core Security Feature Audits (F1-F6).
     #    Recurrence (F7) is handled after the provisional verdict, because a
     #    serial only becomes a "seizure" once the note itself looks suspect.
-    findings: List[Finding] = []
+    #    The gate result is carried through as an (unweighted) finding so the
+    #    UI can show that note presence was verified.
+    findings: List[Finding] = [gate_finding]
 
     # F1: Aspect Ratio
     f_aspect = features.check_aspect_ratio(measured_ratio, denomination)
@@ -96,8 +184,11 @@ def process_note_scan(
             risk += weight * (1.0 - score_val)
 
     # 7. Provisional verdict (before recurrence).
-    #    Never output GENUINE on a low-quality image or unsupported denomination.
-    quality_ok = rectify_confidence >= 0.5 and denomination in ("500", "100")
+    #    Usability is judged from the pixels (resolution + focus), NOT from
+    #    whether the rectifier happened to find a clean quad — keying off the
+    #    latter refused a verdict on virtually every real phone photo. If the
+    #    note is legible at all, it gets analysed and judged.
+    quality_ok = usability >= quality.USABILITY_FLOOR and denomination in ("500", "100")
     if not quality_ok:
         provisional = Verdict.INCONCLUSIVE
     elif risk < 0.35:
@@ -128,20 +219,68 @@ def process_note_scan(
         risk = max(risk, 0.90)
         provisional = Verdict.SUSPECT
 
+    # 8b. Blur must not convict.
+    #     Measured on the sample set: a blurred genuine note scores 0.5 on the
+    #     sharpness ROI while a photocopy scores 4.7 — the blurred *real* note
+    #     looks worse. Sharpness, micro-lettering and thread contrast all
+    #     collapse under camera blur exactly as they do under photocopying, so
+    #     when every failure is one of those AND the photograph itself is soft,
+    #     the evidence cannot support a counterfeit call. Report that the image
+    #     is undecidable instead of accusing a possibly genuine note.
+    BLUR_EXPLAINABLE = {"PRINT_SHARPNESS", "MICRO_LETTERING", "SECURITY_THREAD"}
+    failed_codes = {f.code for f in findings if f.passed is False}
+    softened_by_blur = (
+        provisional == Verdict.SUSPECT
+        and failed_codes
+        and failed_codes <= BLUR_EXPLAINABLE
+        and seen_count < 2
+        and image_is_soft
+    )
+    if softened_by_blur:
+        provisional = Verdict.INCONCLUSIVE
+
     # 9. Finalise verdict + human-readable explanation.
     if not quality_ok:
         verdict = Verdict.INCONCLUSIVE
-        risk = max(risk, 0.5)  # unknown note -> at least medium risk
-        explanation = (
-            f"Inconclusive - Low quality image or unsupported denomination "
-            f"(₹{denomination}). Please take a clearer photo."
-        )
+        risk = max(risk, 0.5)  # unjudged note -> at least medium risk
+        # Name the actual blocker. The old message claimed "unsupported
+        # denomination (₹500)" while ₹500 is in fact supported, which sent
+        # users chasing the wrong problem.
+        if denomination == "none":
+            explanation = (
+                "Inconclusive - a banknote was detected, but its denomination "
+                "could not be read. Make sure the value numeral is visible and "
+                "in focus."
+            )
+        elif denomination not in ("500", "100"):
+            explanation = (
+                f"Inconclusive - ₹{denomination} notes are not covered by this "
+                f"engine yet (₹500 and ₹100 are supported)."
+            )
+        else:
+            explanation = (
+                f"Inconclusive - the image cannot be analysed: {quality_reason}."
+            )
     elif provisional == Verdict.GENUINE:
         verdict = Verdict.GENUINE
         explanation = f"Genuine ₹{denomination} banknote. All key security features validated successfully."
     elif provisional == Verdict.INCONCLUSIVE:
         verdict = Verdict.INCONCLUSIVE
-        explanation = f"Inconclusive - Some features (e.g. print sharpness or thread) were unclear on the ₹{denomination} note."
+        # Name the features that were actually unclear rather than listing a
+        # generic "e.g." guess the user cannot act on.
+        unclear = [f.label for f in findings if f.passed is False]
+        detail = ", ".join(unclear) if unclear else "several security features"
+        if softened_by_blur:
+            explanation = (
+                f"Inconclusive - this photo of the ₹{denomination} note is too soft to "
+                f"judge. Camera blur degrades {detail} in exactly the same way a "
+                f"counterfeit does, so no verdict can be given without a sharper photo."
+            )
+        else:
+            explanation = (
+                f"Inconclusive - the ₹{denomination} note could not be confirmed either way: "
+                f"{detail} did not read cleanly. A sharper, evenly lit photo would decide it."
+            )
     else:
         verdict = Verdict.SUSPECT
         failed_features = [f.label for f in findings if f.passed is False]
@@ -182,7 +321,17 @@ def process_note_scan(
         geo=geo_point,
         risk_score=risk,
         risk_band=band_from_score(risk),
-        confidence=rectify_confidence * class_confidence * (ocr_confidence if norm_serial else 1.0),
+        # How much to trust this verdict: how well the note was isolated, how
+        # legible the image was, and how sure the denomination call is.
+        # How much to trust this verdict. Averaged, not multiplied: chaining
+        # factors drove the figure to ~1% whenever any single input was weak
+        # (an unread denomination alone zeroed it), which told the user nothing
+        # and looked broken next to a confident PASS list.
+        confidence=_verdict_confidence(
+            image=max(rectify_confidence, usability),
+            note_presence=likeness,
+            denomination=class_confidence,
+        ),
         verdict=verdict,
         findings=findings,
         evidence=[evidence],
@@ -191,7 +340,12 @@ def process_note_scan(
         raw={
             "denomination": denomination,
             "serial": serial_no,
-            "recurrence_count": seen_count
+            "recurrence_count": seen_count,
+            "is_banknote": True,
+            "banknote_likeness": likeness,
+            "usability": usability,
+            "serial_source": serial_source,
+            "rectify_confidence": rectify_confidence
         }
     )
     

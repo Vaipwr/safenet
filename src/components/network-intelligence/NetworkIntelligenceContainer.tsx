@@ -98,11 +98,11 @@ export function NetworkIntelligenceContainer({ onAddAuditLog }: NetworkIntellige
       />
 
       {/* 4. Prominent Search & Trace Bar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg" id="trace-suspect-card">
+      <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-4" id="trace-suspect-card">
         <form onSubmit={handleSearchAndTrace} className="flex flex-col md:flex-row items-center gap-3">
           <div className="flex items-center gap-2 shrink-0">
-            <Search className="w-4.5 h-4.5 text-emerald-400" />
-            <span className="text-xs font-extrabold text-slate-200 uppercase font-mono tracking-wider">Trace Suspect Entity</span>
+            <Search className="w-4.5 h-4.5 text-[var(--color-safe)]" />
+            <span className="text-xs font-semibold text-[var(--color-ink)] uppercase font-mono tracking-wider">Trace Suspect Entity</span>
           </div>
 
           <div className="flex gap-2 shrink-0">
@@ -111,10 +111,10 @@ export function NetworkIntelligenceContainer({ onAddAuditLog }: NetworkIntellige
                 key={type}
                 type="button"
                 onClick={() => setSuspectType(type)}
-                className={`px-3 py-1.5 text-[10px] font-mono capitalize rounded-lg border transition-all ${
+                className={`px-3 py-1.5 text-[10px] font-mono capitalize rounded-[3px] border transition-all ${
                   suspectType === type
-                    ? "bg-slate-800 border-emerald-500/50 text-slate-100 font-bold shadow-sm"
-                    : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                    ? "bg-[var(--color-surface-2)] border-[var(--color-line)] text-[var(--color-ink)] font-semibold shadow-sm"
+                    : "bg-[var(--color-paper)] border-[var(--color-line)] hover:border-[var(--color-line)] text-[var(--color-ink-2)]"
                 }`}
               >
                 {type.replace("_", " ")}
@@ -127,13 +127,13 @@ export function NetworkIntelligenceContainer({ onAddAuditLog }: NetworkIntellige
             value={suspectQuery}
             onChange={(e) => setSuspectQuery(e.target.value)}
             placeholder="Search by phone, UPI handle, or account ID (e.g. prizes-kbc@paytm)..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2 text-xs text-slate-200 outline-none focus:border-emerald-500/50 font-mono shadow-inner"
+            className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] px-3.5 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)] font-mono"
           />
 
           <button
             type="submit"
             disabled={!suspectQuery.trim()}
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-800 text-slate-100 disabled:text-slate-600 font-bold rounded-lg text-xs transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:cursor-not-allowed shadow-md"
+            className="px-5 py-2 bg-[var(--color-safe)] hover:bg-[#24503b] disabled:bg-[var(--color-surface-2)] text-white disabled:text-[var(--color-ink-3)] font-semibold rounded-[3px] text-xs transition-all flex items-center gap-2 shrink-0 cursor-pointer disabled:cursor-not-allowed"
           >
             <Play className="w-3.5 h-3.5" />
             <span>Map Money Trail</span>

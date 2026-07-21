@@ -21,6 +21,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 log = logging.getLogger("prahari")
 
+# Load the repo-root .env before any module reads os.getenv. The backend runs
+# from prahari/ while .env lives one level up next to package.json (the Node
+# server loads it from there too), so without this the API keys configured for
+# the project would be invisible to Python and cloud features would silently
+# stay disabled.
+try:
+    from pathlib import Path
+
+    from dotenv import load_dotenv
+
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+except Exception as exc:  # noqa: BLE001 — env file is optional
+    log.warning("Could not load .env (%s); relying on process environment", exc)
+
 app = FastAPI(
     title="PRAHARI — AI for Digital Public Safety",
     description="One entity graph. Five sensors.",

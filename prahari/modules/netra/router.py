@@ -9,6 +9,21 @@ from modules.netra import serial_store
 
 router = APIRouter(prefix="/api/netra", tags=["netra"])
 
+
+@router.on_event("startup")
+def _warm_models() -> None:
+    """Load CLIP before the first upload arrives, in a worker thread so the
+    server starts accepting requests immediately."""
+    import threading
+
+    from modules.netra import clip_gate, ocr
+
+    def _warm():
+        clip_gate.warm_up()
+        ocr.warm_up()
+
+    threading.Thread(target=_warm, daemon=True).start()
+
 class ScanBase64Request(BaseModel):
     image_b64: str
     lat: Optional[float] = None

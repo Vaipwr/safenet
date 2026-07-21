@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { SAMPLE_BANKNOTES } from "../data";
 import { CurrencyAnalysis } from "../types";
-import { Coins, Upload, Search, Activity, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Coins, Upload, Search, Activity, ShieldCheck, AlertTriangle, ImageOff } from "lucide-react";
 
 interface CurrencyForensicsProps {
   onAddAuditLog: (msg: string) => void;
@@ -16,6 +16,19 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
   // button can re-analyse the upload instead of a name tag with no image.
   const [uploadedB64, setUploadedB64] = useState<string | null>(null);
   const [activeHoverMark, setActiveHoverMark] = useState<any | null>(null);
+
+  // Surface the server's own explanation (e.g. "analysis engine unavailable")
+  // instead of a bare status code, which told the user nothing actionable.
+  const throwServerError = async (response: Response) => {
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = body?.message || body?.error || "";
+    } catch {
+      /* non-JSON error body — fall back to the status code alone */
+    }
+    throw new Error(detail || `Server responded ${response.status}`);
+  };
 
   // Reject responses that are missing the fields the UI renders, so a bad
   // payload surfaces as a clear message instead of a blank panel or a crash.
@@ -45,7 +58,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      if (!response.ok) throw new Error(`Server responded ${response.status}`);
+      if (!response.ok) await throwServerError(response);
       const data = await response.json();
       if (!isValidAnalysis(data)) throw new Error("Malformed analysis response");
       setAnalysisResult(data);
@@ -77,7 +90,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ noteImageBase64: reader.result }),
           });
-          if (!response.ok) throw new Error(`Server responded ${response.status}`);
+          if (!response.ok) await throwServerError(response);
           const data = await response.json();
           if (!isValidAnalysis(data)) throw new Error("Malformed analysis response");
           setAnalysisResult(data);
@@ -106,12 +119,12 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6" id="currency-root-panel">
       {/* Selector and Controller */}
       <div className="lg:col-span-4 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-select-card">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="currency-select-card">
           <div className="flex items-center gap-2 mb-4">
-            <Coins className="w-5 h-5 text-amber-500" />
-            <h3 className="font-semibold text-slate-100">Banknote Specimen</h3>
+            <Coins className="w-5 h-5 text-[var(--color-navy)]" />
+            <h3 className="font-semibold text-[var(--color-ink)]">Banknote Specimen</h3>
           </div>
-          <p className="text-xs text-slate-400 mb-4">
+          <p className="text-xs text-[var(--color-ink-2)] mb-4">
             Select an official Reserve Bank of India banknote sample or upload a clear photo of your own Rs 500 bill to run an automated threat assessment.
           </p>
 
@@ -125,30 +138,30 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
                   setAnalysisResult(null);
                   setErrorMsg(null);
                 }}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                className={`w-full text-left p-3 rounded-[3px] border transition-all ${
                   selectedNote.id === note.id
-                    ? "bg-slate-800/80 border-amber-500/50 text-slate-100"
-                    : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                    ? "bg-[var(--color-surface-2)] border-[var(--color-line)] text-[var(--color-ink)]"
+                    : "bg-[var(--color-paper)] border-[var(--color-line)] hover:border-[var(--color-line)] text-[var(--color-ink-2)]"
                 }`}
               >
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-semibold text-slate-200">{note.name}</span>
+                  <span className="text-xs font-semibold text-[var(--color-ink)]">{note.name}</span>
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    note.isValid ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                    note.isValid ? "bg-[var(--color-safe-tint)] text-[var(--color-safe)]" : "bg-[var(--color-critical-tint)] text-[var(--color-critical)]"
                   }`}>
                     {note.isValid ? "Genuine Type" : "Scam Specimen"}
                   </span>
                 </div>
-                <p className="text-[10px] leading-relaxed text-slate-400">{note.description}</p>
+                <p className="text-[10px] leading-relaxed text-[var(--color-ink-2)]">{note.description}</p>
               </button>
             ))}
           </div>
 
-          <div className="border-t border-slate-800 pt-4" id="currency-upload-block">
-            <label className="flex flex-col items-center justify-center border border-dashed border-slate-800 hover:border-slate-700 rounded-lg p-4 cursor-pointer bg-slate-950 transition-all">
-              <Upload className="w-5 h-5 text-slate-500 mb-1" />
-              <span className="text-xs font-medium text-slate-300">Upload Custom Note Image</span>
-              <span className="text-[9px] text-slate-500 mt-1">PNG, JPG up to 5MB</span>
+          <div className="border-t border-[var(--color-line)] pt-4" id="currency-upload-block">
+            <label className="flex flex-col items-center justify-center border border-dashed border-[var(--color-line)] hover:border-[var(--color-line)] rounded-[3px] p-4 cursor-pointer bg-[var(--color-paper)] transition-all">
+              <Upload className="w-5 h-5 text-[var(--color-ink-3)] mb-1" />
+              <span className="text-xs font-medium text-[var(--color-ink-2)]">Upload Custom Note Image</span>
+              <span className="text-[9px] text-[var(--color-ink-3)] mt-1">PNG, JPG up to 5MB</span>
               <input type="file" accept="image/*" className="hidden" onChange={handleCustomUpload} />
             </label>
           </div>
@@ -157,7 +170,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             id="run-currency-forensics"
             onClick={() => triggerVerification(selectedNote.id)}
             disabled={isLoading}
-            className="w-full mt-4 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-800 text-slate-950 disabled:text-slate-600 font-semibold rounded-lg text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full mt-4 py-2.5 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] disabled:bg-[var(--color-surface-2)] text-white disabled:text-[var(--color-ink-3)] font-semibold rounded-[3px] text-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
             {isLoading ? (
               <>
@@ -174,60 +187,83 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
         </div>
 
         {errorMsg && (
-          <div className="bg-rose-500/10 border border-rose-500/30 rounded-xl p-4 flex items-start gap-3" id="currency-error-banner">
-            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+          <div className="bg-[var(--color-critical-tint)] border border-[var(--color-line)] rounded-[3px] p-4 flex items-start gap-3" id="currency-error-banner">
+            <AlertTriangle className="w-5 h-5 text-[var(--color-critical)] shrink-0 mt-0.5" />
             <div>
-              <p className="text-xs font-bold text-rose-400">Scan could not complete</p>
-              <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">{errorMsg}</p>
+              <p className="text-xs font-semibold text-[var(--color-critical)]">Scan could not complete</p>
+              <p className="text-[11px] text-[var(--color-ink-2)] mt-1 leading-relaxed">{errorMsg}</p>
             </div>
           </div>
         )}
 
         {analysisResult && (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-verdict-summary">
-            <h4 className="font-semibold text-xs text-slate-300 uppercase tracking-wider mb-3">Verification Verdict</h4>
-            <div className={`p-4 rounded-lg flex items-start gap-3 ${
-              analysisResult.isValid ? "bg-emerald-500/10 border border-emerald-500/20" : "bg-rose-500/10 border border-rose-500/20"
+          <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="currency-verdict-summary">
+            <h4 className="font-semibold text-xs text-[var(--color-ink-2)] uppercase tracking-wider mb-3">Verification Verdict</h4>
+            {/* Three distinct outcomes: the image was not a note at all, the
+                note passed, or it failed. Rejecting a non-note must not read
+                as a counterfeit accusation. */}
+            {analysisResult.isBanknote === false ? (
+              <div className="p-4 rounded-[3px] flex items-start gap-3 bg-[var(--color-warn-tint,var(--color-critical-tint))] border border-[var(--color-line)]">
+                <ImageOff className="w-5 h-5 text-[var(--color-ink-2)] shrink-0 mt-0.5" />
+                <div>
+                  <span className="text-xs font-semibold text-[var(--color-ink)]">NOT A BANKNOTE</span>
+                  <p className="text-[11px] text-[var(--color-ink-2)] mt-1 leading-relaxed">
+                    {analysisResult.mismatchReason ||
+                      "This image does not appear to contain an Indian currency note."}
+                  </p>
+                  <p className="text-[10px] text-[var(--color-ink-3)] mt-2 leading-relaxed">
+                    Tip: photograph the note flat, well lit, filling most of the frame.
+                  </p>
+                </div>
+              </div>
+            ) : (
+            <div className={`p-4 rounded-[3px] flex items-start gap-3 ${
+              analysisResult.isValid ? "bg-[var(--color-safe-tint)] border border-[var(--color-line)]" : "bg-[var(--color-critical-tint)] border border-[var(--color-line)]"
             }`}>
               {analysisResult.isValid ? (
-                <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <ShieldCheck className="w-5 h-5 text-[var(--color-safe)] shrink-0 mt-0.5" />
               ) : (
-                <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-[var(--color-critical)] shrink-0 mt-0.5" />
               )}
               <div>
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold ${analysisResult.isValid ? "text-emerald-400" : "text-rose-400"}`}>
-                    {analysisResult.isValid ? "VALID BANKNOTE" : "COUNTERFEIT ALERT"}
+                  <span className={`text-xs font-semibold ${analysisResult.isValid ? "text-[var(--color-safe)]" : "text-[var(--color-critical)]"}`}>
+                    {analysisResult.isValid
+                      ? "VALID BANKNOTE"
+                      : analysisResult.verdict === "inconclusive"
+                        ? "INCONCLUSIVE"
+                        : "COUNTERFEIT ALERT"}
                   </span>
-                  <span className="text-[10px] text-slate-500 font-mono">Conf: {analysisResult.confidence}%</span>
+                  <span className="text-[10px] text-[var(--color-ink-3)] font-mono">Conf: {analysisResult.confidence}%</span>
                 </div>
-                <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
-                  {analysisResult.isValid 
+                <p className="text-[11px] text-[var(--color-ink-2)] mt-1 leading-relaxed">
+                  {analysisResult.isValid
                     ? "All vital Reserve Bank of India security indices align perfectly with state treasury parameters."
                     : `Forensic warning: ${analysisResult.mismatchReason}`}
                 </p>
-                <div className="mt-2 text-[10px] font-mono text-slate-400">
+                <div className="mt-2 text-[10px] font-mono text-[var(--color-ink-2)]">
                   Serial No: {analysisResult.serialNo}
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Visual Canvas and Heatmap */}
       <div className="lg:col-span-8 space-y-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-canvas-card">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="currency-canvas-card">
           <div className="flex justify-between items-center mb-4">
-            <h3 className="font-semibold text-slate-100 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-amber-500" />
+            <h3 className="font-semibold text-[var(--color-ink)] flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[var(--color-navy)]" />
               <span>Inspection Heatmap Overlays</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">RBI Banknote Safety Protocol v4.2</span>
+            <span className="text-[10px] font-mono text-[var(--color-ink-3)]">RBI Banknote Safety Protocol v4.2</span>
           </div>
 
           {/* Interactive Bounding Box Stage */}
-          <div className="relative border border-slate-800 rounded-xl overflow-hidden bg-slate-950 flex items-center justify-center p-4 min-h-[300px]">
+          <div className="relative border border-[var(--color-line)] rounded-[3px] overflow-hidden bg-[var(--color-paper)] flex items-center justify-center p-4 min-h-[300px]">
             {/* Wrapper shrinks to the rendered image so overlay boxes are
                 positioned relative to the NOTE, not the letterboxed panel. */}
             <div className="relative inline-block">
@@ -235,7 +271,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
                 src={selectedNote.imageUrl}
                 alt="Rupee Note Specimen"
                 referrerPolicy="no-referrer"
-                className="block max-h-[320px] w-auto rounded-lg object-contain select-none"
+                className="block max-h-[320px] w-auto rounded-[3px] object-contain select-none"
               />
 
               {/* Render analysis overlays if loaded — % is relative to the image */}
@@ -253,15 +289,15 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
                   }}
                   className={`absolute cursor-pointer border transition-all duration-300 ${
                     activeHoverMark?.label === mark.label
-                      ? "bg-amber-500/10 border-amber-400 ring-2 ring-amber-400 shadow-lg"
+                      ? "bg-[var(--color-navy-tint)] border-[var(--color-navy)] ring-2 ring-[var(--color-navy)]/20"
                       : mark.status === "valid"
-                        ? "border-emerald-500/60 hover:bg-emerald-500/10"
-                        : "border-rose-500/60 hover:bg-rose-500/10"
+                        ? "border-[var(--color-line)] hover:bg-[var(--color-safe-tint)]"
+                        : "border-[var(--color-line)] hover:bg-[var(--color-critical-tint)]"
                   }`}
                 >
                   {/* Visual marker pin */}
-                  <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full flex items-center justify-center font-mono text-[8px] font-bold text-slate-950 ${
-                    mark.status === "valid" ? "bg-emerald-400" : "bg-rose-400"
+                  <div className={`absolute -top-1.5 -left-1.5 w-3 h-3 rounded-full flex items-center justify-center font-mono text-[8px] font-semibold text-white ${
+                    mark.status === "valid" ? "bg-[var(--color-safe)]" : "bg-[var(--color-critical)]"
                   }`}>
                     {index + 1}
                   </div>
@@ -270,42 +306,42 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             </div>
 
             {isLoading && (
-              <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center text-slate-100 gap-3">
-                <Activity className="w-8 h-8 text-amber-500 animate-spin" />
-                <span className="text-xs font-mono text-slate-400">Performing high-precision RGB watermark alignment...</span>
+              <div className="absolute inset-0 bg-[var(--color-paper)] flex flex-col items-center justify-center text-[var(--color-ink)] gap-3">
+                <Activity className="w-8 h-8 text-[var(--color-navy)] animate-spin" />
+                <span className="text-xs font-mono text-[var(--color-ink-2)]">Performing high-precision RGB watermark alignment...</span>
               </div>
             )}
 
             {!analysisResult && !isLoading && (
-              <div className="absolute inset-0 bg-slate-950/30 flex items-center justify-center pointer-events-none">
-                <div className="bg-slate-900/90 border border-slate-800 px-4 py-2.5 rounded-lg text-center shadow-lg">
-                  <p className="text-xs text-slate-300 font-semibold">Ready for Spectral Scan</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Click 'Run Inspection Verdict' to segment security markers.</p>
+              <div className="absolute inset-0 bg-[var(--color-paper)] flex items-center justify-center pointer-events-none">
+                <div className="bg-[var(--color-surface)] border border-[var(--color-line)] px-4 py-2.5 rounded-[3px] text-center">
+                  <p className="text-xs text-[var(--color-ink-2)] font-semibold">Ready for Spectral Scan</p>
+                  <p className="text-[10px] text-[var(--color-ink-3)] mt-0.5">Click 'Run Inspection Verdict' to segment security markers.</p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Active Landmark Information */}
-          <div className="mt-4 p-4 bg-slate-950 border border-slate-800 rounded-lg min-h-[70px]">
+          <div className="mt-4 p-4 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] min-h-[70px]">
             {activeHoverMark ? (
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className={`w-2 h-2 rounded-full ${
-                    activeHoverMark.status === "valid" ? "bg-emerald-400" : "bg-rose-400"
+                    activeHoverMark.status === "valid" ? "bg-[var(--color-safe)]" : "bg-[var(--color-critical)]"
                   }`} />
-                  <span className="text-xs font-bold text-slate-200">{activeHoverMark.label}</span>
+                  <span className="text-xs font-semibold text-[var(--color-ink)]">{activeHoverMark.label}</span>
                   <span className={`text-[9px] uppercase px-1.5 font-mono rounded ${
-                    activeHoverMark.status === "valid" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                    activeHoverMark.status === "valid" ? "bg-[var(--color-safe-tint)] text-[var(--color-safe)]" : "bg-[var(--color-critical-tint)] text-[var(--color-critical)]"
                   }`}>
                     {activeHoverMark.status}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">{activeHoverMark.description}</p>
+                <p className="text-[11px] text-[var(--color-ink-2)] leading-relaxed">{activeHoverMark.description}</p>
               </div>
             ) : (
               <div className="flex items-center justify-center h-full py-2">
-                <p className="text-[11px] text-slate-500">
+                <p className="text-[11px] text-[var(--color-ink-3)]">
                   {analysisResult 
                     ? "Hover over the green/red boxes on the banknote to inspect security markers in real-time."
                     : "Forensic indicators will display here once the verification process is complete."}
@@ -318,18 +354,18 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
         {analysisResult && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Feature Audit Checklist */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-features-list">
-              <h4 className="font-semibold text-xs text-slate-300 uppercase tracking-wider mb-3">Feature Checklist Verification</h4>
+            <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="currency-features-list">
+              <h4 className="font-semibold text-xs text-[var(--color-ink-2)] uppercase tracking-wider mb-3">Feature Checklist Verification</h4>
               <div className="space-y-2">
                 {analysisResult.features.map((feat, index) => (
-                  <div key={index} className="flex justify-between items-center p-2 rounded bg-slate-950 border border-slate-800/60 text-xs">
-                    <span className="text-slate-300 font-medium">{feat.name}</span>
+                  <div key={index} className="flex justify-between items-center p-2 rounded bg-[var(--color-paper)] border border-[var(--color-line)]/60 text-xs">
+                    <span className="text-[var(--color-ink-2)] font-medium">{feat.name}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-slate-400">{feat.detail}</span>
+                      <span className="text-[10px] text-[var(--color-ink-2)]">{feat.detail}</span>
                       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                         feat.status === "PASS"
-                          ? "bg-emerald-500/10 text-emerald-400"
-                          : "bg-rose-500/10 text-rose-400"
+                          ? "bg-[var(--color-safe-tint)] text-[var(--color-safe)]"
+                          : "bg-[var(--color-critical-tint)] text-[var(--color-critical)]"
                       }`}>
                         {feat.status}
                       </span>
@@ -340,12 +376,12 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             </div>
 
             {/* Detailed Machine Audit Logs */}
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5" id="currency-audit-ledger">
-              <h4 className="font-semibold text-xs text-slate-300 uppercase tracking-wider mb-3">Technical Audit Log</h4>
-              <div className="bg-slate-950 border border-slate-800 rounded-lg p-3 h-[130px] overflow-y-auto font-mono text-[10px] text-slate-400 space-y-1.5">
+            <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-5" id="currency-audit-ledger">
+              <h4 className="font-semibold text-xs text-[var(--color-ink-2)] uppercase tracking-wider mb-3">Technical Audit Log</h4>
+              <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3 h-[130px] overflow-y-auto font-mono text-[10px] text-[var(--color-ink-2)] space-y-1.5">
                 {analysisResult.auditLog.map((log, index) => (
                   <div key={index} className="flex items-start gap-1.5 leading-relaxed">
-                    <span className="text-amber-500 shrink-0">⚡</span>
+                    <span className="text-[var(--color-navy)] shrink-0">⚡</span>
                     <span>{log}</span>
                   </div>
                 ))}

@@ -19,31 +19,31 @@ export function DisruptionControls({ disruptionSummary, onResetSimulation }: Dis
   };
 
   return (
-    <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-5 space-y-4 shadow-xl" id="disruption-controls-panel">
+    <div className="bg-[var(--color-critical-tint)] border border-[var(--color-line)] rounded-[3px] p-5 space-y-4" id="disruption-controls-panel">
       {/* Header & Reset Button */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-rose-500/20">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-[var(--color-line)]">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-rose-500/20 rounded-xl text-rose-400 border border-rose-500/30 shadow-inner">
-            <Zap className="w-5 h-5 animate-pulse" />
+          <div className="p-2.5 bg-[var(--color-critical-tint)] rounded-[3px] text-[var(--color-critical)] border border-[var(--color-line)]">
+            <Zap className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="text-sm font-extrabold text-rose-400 font-display flex items-center gap-2">
+            <h4 className="text-sm font-semibold text-[var(--color-critical)] font-display flex items-center gap-2">
               <span>Network Disruption Simulation Active</span>
-              <span className="text-[10px] font-mono text-rose-300 bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/30">
+              <span className="text-[10px] font-mono text-[var(--color-critical)] bg-[var(--color-critical-tint)] px-2 py-0.5 rounded-full border border-[var(--color-line)]">
                 Warrants Enforced
               </span>
             </h4>
-            <p className="text-xs text-slate-300 font-mono">
-              Targeted nodes frozen: <span className="font-bold text-rose-300">{disruptionSummary.frozenNodeIds.join(", ")}</span>
+            <p className="text-xs text-[var(--color-ink-2)] font-mono">
+              Targeted nodes frozen: <span className="font-semibold text-[var(--color-critical)]">{disruptionSummary.frozenNodeIds.join(", ")}</span>
             </p>
           </div>
         </div>
 
         <button
           onClick={onResetSimulation}
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer shadow-md shrink-0 hover:border-slate-600"
+          className="px-4 py-2 bg-[var(--color-paper)] hover:bg-[var(--color-surface-2)] text-[var(--color-ink)] border border-[var(--color-line)] rounded-[3px] text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer shrink-0 hover:border-[var(--color-line)]"
         >
-          <RefreshCw className="w-4 h-4 text-emerald-400" />
+          <RefreshCw className="w-4 h-4 text-[var(--color-safe)]" />
           <span>Reset Simulation</span>
         </button>
       </div>
@@ -51,46 +51,46 @@ export function DisruptionControls({ disruptionSummary, onResetSimulation }: Dis
       {/* Disruption Metrics Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {/* Threat Reduction Percentage */}
-        <div className="bg-slate-950/80 border border-rose-500/20 rounded-xl p-3.5 space-y-1.5">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Threat Capability Reduced</span>
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3.5 space-y-1.5">
+          <span className="text-[10px] font-mono text-[var(--color-ink-2)] uppercase font-semibold">Threat Capability Reduced</span>
           <div className="flex items-baseline gap-2">
-            <span className="text-2xl font-black text-rose-400 font-display">
+            <span className="text-2xl font-semibold text-[var(--color-critical)] font-display">
               {disruptionSummary.networkDisruptionPercentage}%
             </span>
           </div>
-          <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden">
+          <div className="w-full bg-[var(--color-paper)] h-2 rounded-full overflow-hidden">
             <div
-              className="bg-rose-500 h-2 rounded-full transition-all duration-500"
+              className="bg-[var(--color-critical)] h-2 rounded-full transition-all duration-500"
               style={{ width: `${disruptionSummary.networkDisruptionPercentage}%` }}
             />
           </div>
         </div>
 
         {/* Illicit Amount Blocked */}
-        <div className="bg-slate-950/80 border border-emerald-500/20 rounded-xl p-3.5 space-y-1">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Illicit Volume Blocked</span>
-          <div className="text-2xl font-black text-emerald-400 font-display">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3.5 space-y-1">
+          <span className="text-[10px] font-mono text-[var(--color-ink-2)] uppercase font-semibold">Illicit Volume Blocked</span>
+          <div className="text-2xl font-semibold text-[var(--color-safe)] font-display">
             {formatAmount(disruptionSummary.blockedVolume)}
           </div>
-          <p className="text-[10px] text-slate-500 font-mono">Secured from laundering flow</p>
+          <p className="text-[10px] text-[var(--color-ink-3)] font-mono">Secured from laundering flow</p>
         </div>
 
         {/* Money Trails Severed */}
-        <div className="bg-slate-950/80 border border-amber-500/20 rounded-xl p-3.5 space-y-1">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Money Trails Severed</span>
-          <div className="text-2xl font-black text-amber-400 font-display">
+        <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3.5 space-y-1">
+          <span className="text-[10px] font-mono text-[var(--color-ink-2)] uppercase font-semibold">Money Trails Severed</span>
+          <div className="text-2xl font-semibold text-[var(--color-navy)] font-display">
             {disruptionSummary.severedEdgeCount} edges
           </div>
-          <p className="text-[10px] text-slate-500 font-mono">Disrupted transfer lines</p>
+          <p className="text-[10px] text-[var(--color-ink-3)] font-mono">Disrupted transfer lines</p>
         </div>
 
         {/* Syndicates Collapsed */}
-        <div className="bg-slate-950/80 border border-purple-500/20 rounded-xl p-3.5 space-y-1">
-          <span className="text-[10px] font-mono text-slate-400 uppercase font-semibold">Syndicates Collapsed</span>
-          <div className="text-2xl font-black text-purple-400 font-display">
+        <div className="bg-[var(--color-paper)] border border-purple-500/20 rounded-[3px] p-3.5 space-y-1">
+          <span className="text-[10px] font-mono text-[var(--color-ink-2)] uppercase font-semibold">Syndicates Collapsed</span>
+          <div className="text-2xl font-semibold text-[var(--color-navy)] font-display">
             {disruptionSummary.collapsedRingCount} rings
           </div>
-          <p className="text-[10px] text-slate-500 font-mono">Dismantled criminal clusters</p>
+          <p className="text-[10px] text-[var(--color-ink-3)] font-mono">Dismantled criminal clusters</p>
         </div>
       </div>
     </div>

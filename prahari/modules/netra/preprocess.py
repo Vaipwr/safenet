@@ -90,8 +90,54 @@ def rectify_image(image_bytes: bytes) -> Tuple[np.ndarray, float, float]:
                 aspect_ratio = 1.0 / aspect_ratio if aspect_ratio > 0 else 0.0
             return warped, aspect_ratio, 0.85
 
-    # Fallback to whole image if no note-sized region found
-    # Calculate aspect ratio of original (or resized) image
+    # Pass 3: Canny found nothing usable — typical for a note photographed on a
+    # low-contrast surface, or under soft light where the border edge is weak.
+    # Segment the note as *foreground* instead of tracing its outline: notes are
+    # saturated/textured relative to a desk, so Otsu on the saturation channel
+    # plus a morphological close usually isolates them when edges fail.
+    warped, aspect_ratio = _segment_foreground(img_resized, _order_points, _warp, MIN_AREA_FRAC)
+    if warped is not None:
+        if aspect_ratio < 1.0:
+            warped = cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
+            aspect_ratio = 1.0 / aspect_ratio if aspect_ratio > 0 else 0.0
+        return warped, aspect_ratio, 0.75
+
+    # Pass 4: the user may have cropped tightly to the note, so there is no
+    # border to find — the frame *is* the note. Accept it when the frame itself
+    # already has banknote proportions.
     h_r, w_r = img_resized.shape[:2]
     aspect_ratio = w_r / float(h_r) if h_r > 0 else 0.0
-    return img_resized, aspect_ratio, 0.4
+    if 1.85 <= aspect_ratio <= 2.45:
+        return img_resized, aspect_ratio, 0.70
+
+    # Final fallback: hand back the whole frame. Confidence now reflects how
+    # note-like the frame is rather than a flat 0.4, which used to force every
+    # real-world photo into an INCONCLUSIVE verdict.
+    confidence = 0.55 if 1.6 <= aspect_ratio <= 2.8 else 0.4
+    return img_resized, aspect_ratio, confidence
+
+
+def _segment_foreground(img_resized, order_points, warp, min_area_frac):
+    """Isolate the note by saturation/intensity segmentation. Returns (warped, ratio)."""
+    try:
+        hsv = cv2.cvtColor(img_resized, cv2.COLOR_BGR2HSV)
+        sat = hsv[:, :, 1]
+        _, mask = cv2.threshold(sat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # Close gaps so the note becomes one solid blob rather than its print.
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+
+        cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not cnts:
+            return None, 0.0
+        biggest = max(cnts, key=cv2.contourArea)
+        img_area = float(img_resized.shape[0] * img_resized.shape[1])
+        if cv2.contourArea(biggest) < min_area_frac * img_area:
+            return None, 0.0
+
+        box = cv2.boxPoints(cv2.minAreaRect(biggest))
+        return warp(order_points(box.astype("float32")))
+    except Exception:  # noqa: BLE001 — segmentation is a fallback, never fatal
+        return None, 0.0

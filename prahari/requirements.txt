@@ -1,0 +1,20 @@
+# PRAHARI backend — direct dependencies.
+# Install:  .venv/Scripts/python.exe -m pip install -r requirements.txt
+
+fastapi
+uvicorn
+python-dotenv
+pydantic
+python-multipart
+
+# NETRA currency CV
+opencv-python
+numpy
+
+# Zero-shot banknote recognition (CLIP ViT-B/32) and serial/denomination OCR.
+# Both use pretrained weights — nothing is trained in this repo. Weights are
+# downloaded once (~600MB CLIP, ~64MB EasyOCR) and cached under ~/.cache.
+transformers
+torch
+easyocr
+pillow
