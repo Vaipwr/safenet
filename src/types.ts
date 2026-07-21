@@ -126,3 +126,5 @@ export interface OfficerSignupRequest {
   date: string;
 }
 
+// JAAL Module Interface Exports
+export * from "./types/jaal";
