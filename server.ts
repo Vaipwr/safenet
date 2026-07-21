@@ -3,6 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+import { getSyntheticGraph, simulateDisruption } from "./server/jaal/graphEngine";
 
 dotenv.config();
 
@@ -521,9 +522,22 @@ Provide response in strict JSON:
   });
 });
 
+// ==========================================
+// 5. API Endpoint: JAAL Fraud Network Intelligence
+// ==========================================
+app.get("/api/jaal/graph", (_req, res) => {
+  const result = getSyntheticGraph();
+  res.json(result);
+});
+
+app.post("/api/jaal/disrupt", (req, res) => {
+  const { frozenNodeIds } = req.body || {};
+  const result = simulateDisruption(Array.isArray(frozenNodeIds) ? frozenNodeIds : []);
+  res.json(result);
+});
 
 // ==========================================
-// 5. Serve Vite Middleware or Static Files
+// 6. Serve Vite Middleware or Static Files
 // ==========================================
 async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
