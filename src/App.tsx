@@ -43,7 +43,12 @@ import {
   MapPin,
   Check,
   TrendingUp,
-  UserCheck
+  UserCheck,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  CheckCircle2,
+  UploadCloud
 } from "lucide-react";
 
 const ADVISORIES_DATA = [
@@ -148,13 +153,36 @@ export default function App() {
   const [selectedRole, setSelectedRole] = useState<"officer" | "bank_rep" | "admin" | "citizen">("citizen");
   const [regForm, setRegForm] = useState({
     name: "Rajesh Kumar",
+    email: "rajesh.kumar@cert-in.gov.in",
     phone: "+91 98234 88392",
     organisation: "Delhi Police Cyber Cell",
     employeeId: "DP-2024-8839",
     password: "",
+    confirmPassword: ""
   });
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [regErrors, setRegErrors] = useState<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    organisation?: string;
+    employeeId?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+
+  // Final Verification state
   const [otpCodes, setOtpCodes] = useState(["", "", "", "", "", ""]);
   const [uploadedIdName, setUploadedIdName] = useState<string | null>(null);
+  const [verifyErrors, setVerifyErrors] = useState<{ doc?: string; otp?: string }>({});
+
+  // Dedicated Login State
+  const [loginEmail, setLoginEmail] = useState("vikram.rathore@police.gov.in");
+  const [loginPassword, setLoginPassword] = useState("Police#2026");
+  const [loginRole, setLoginRole] = useState<"citizen" | "officer" | "bank_rep" | "admin">("officer");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [loginErrors, setLoginErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   // Reports Page State
   const [reports, setReports] = useState<IncidentReport[]>(INITIAL_REPORTS);
@@ -320,16 +348,95 @@ export default function App() {
     setAuditLogs((prev) => [`[${time}] ${msg}`, ...prev.slice(0, 49)]);
   };
 
-  // Auth flow handlers
+  // Auth Role selector helper with demo pre-fills
+  const handleSelectLoginRole = (role: "citizen" | "officer" | "bank_rep" | "admin") => {
+    setLoginRole(role);
+    setLoginErrors({});
+    if (role === "officer") {
+      setLoginEmail("vikram.rathore@police.gov.in");
+      setLoginPassword("Police#2026");
+    } else if (role === "bank_rep") {
+      setLoginEmail("anjali.sharma@icici.com");
+      setLoginPassword("BankNodal#2026");
+    } else if (role === "admin") {
+      setLoginEmail("admin@cert-in.gov.in");
+      setLoginPassword("AdminCertIn#2026");
+    } else {
+      setLoginEmail("citizen.shield@safenet.gov.in");
+      setLoginPassword("CitizenPass#2026");
+    }
+  };
+
+  // Auth flow handlers with strict validation
   const handleRegSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addAuditLog(`Saved account details for ${regForm.name} (${regForm.organisation})`);
+    const errors: typeof regErrors = {};
+
+    if (!regForm.name.trim() || regForm.name.trim().length < 3) {
+      errors.name = "Full name must be at least 3 characters long.";
+    }
+
+    const emailClean = (regForm.email || "").trim();
+    if (!emailClean) {
+      errors.email = "Official email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      errors.email = "Please enter a valid email address (e.g., name@domain.com).";
+    }
+
+    const phoneClean = regForm.phone.replace(/\s+/g, "");
+    if (!phoneClean || phoneClean.length < 10) {
+      errors.phone = "Valid contact phone number is required (at least 10 digits).";
+    }
+
+    if (!regForm.organisation.trim()) {
+      errors.organisation = "Official Nodal Organisation name is required.";
+    }
+
+    if (!regForm.employeeId.trim() || regForm.employeeId.trim().length < 3) {
+      errors.employeeId = "Valid Government or Employee ID is required (min 3 chars).";
+    }
+
+    if (!regForm.password) {
+      errors.password = "Password credential is required.";
+    } else if (regForm.password.length < 6) {
+      errors.password = "Password must be at least 6 characters long.";
+    }
+
+    if (regForm.confirmPassword && regForm.confirmPassword !== regForm.password) {
+      errors.confirmPassword = "Passwords do not match.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setRegErrors(errors);
+      return;
+    }
+
+    setRegErrors({});
+    addAuditLog(`Validated registration credentials for ${regForm.name} (${regForm.organisation})`);
     setActiveScreen("final_verification");
   };
 
   const handleVerificationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addAuditLog(`OTP validated and Government ID parsed. Submitting for approval.`);
+    const errors: { doc?: string; otp?: string } = {};
+
+    const enteredOtp = otpCodes.join("");
+    if (enteredOtp.length < 6) {
+      errors.otp = "Please enter the complete 6-digit OTP security code.";
+    }
+
+    if (!uploadedIdName && selectedRole !== "citizen") {
+      errors.doc = "Official Nodal Authorization Document (PDF or ID photo) is required.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setVerifyErrors(errors);
+      return;
+    }
+
+    setVerifyErrors({});
+    addAuditLog(`OTP validated and Nodal Document (${uploadedIdName || "Digital ID"}) verified.`);
+
     if (selectedRole === "officer" || selectedRole === "bank_rep") {
       const newReq: OfficerSignupRequest = {
         id: `REQ-2026-${Math.floor(Math.random() * 9000 + 1000)}`,
@@ -349,12 +456,36 @@ export default function App() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    addAuditLog(`Sovereign sign-in completed for role: ${selectedRole.toUpperCase()}`);
+    const errors: typeof loginErrors = {};
+
+    const emailClean = loginEmail.trim();
+    if (!emailClean) {
+      errors.email = "Official email address is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      errors.email = "Please enter a valid email address.";
+    }
+
+    if (!loginPassword) {
+      errors.password = "Password credential is required.";
+    } else if (loginPassword.length < 6) {
+      errors.password = "Password must be at least 6 characters long.";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setLoginErrors(errors);
+      return;
+    }
+
+    setLoginErrors({});
+    const derivedName = emailClean.split("@")[0].split(".").map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(" ");
+
+    addAuditLog(`Sovereign sign-in completed for role: ${loginRole.toUpperCase()} (${emailClean})`);
     setSession({
-      id: `USER-${Math.floor(Math.random() * 10000)}`,
-      name: regForm.name || "Arjun Singh",
-      role: selectedRole,
-      email: regForm.employeeId ? `${regForm.name.toLowerCase().replace(" ", ".")}@govt.in` : "arjun.singh@cert-in.gov.in",
+      id: `USER-${Math.floor(Math.random() * 9000 + 1000)}`,
+      name: regForm.name && regForm.name !== "Rajesh Kumar" ? regForm.name : (derivedName || "Authorized Official"),
+      role: loginRole,
+      email: emailClean,
+      organisation: loginRole === "officer" ? "Cyber Crime Branch" : loginRole === "bank_rep" ? "Bank Nodal Cell" : loginRole === "admin" ? "CERT-In Head Office" : "Citizen Portal",
       isLoggedIn: true,
     });
     setActiveScreen("dashboard");
@@ -1255,72 +1386,115 @@ export default function App() {
           </div>
         )}
 
+
+
         {/* ==========================================
-            SCREEN: SIGN-UP PAGE / CITIZEN FAST TRACK
+            SCREEN: QUICK SIGNUP PAGE
            ========================================== */}
         {activeScreen === "signup" && (
-          <div className="max-w-4xl mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] overflow-hidden grid grid-cols-1 md:grid-cols-12" id="signup-screen">
-            {/* Left promo */}
-            <div className="md:col-span-5 bg-[var(--color-paper)] p-8 flex flex-col justify-between border-r border-[var(--color-line)]">
-              <div className="space-y-4">
-                <Shield className="w-8 h-8 text-[var(--color-navy)]" />
-                <h3 className="text-lg font-semibold text-[var(--color-ink)]">National AI Fraud Shield Portal</h3>
-                <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
-                  Register as an Indian citizen today. Get real-time advisories, trace financial cybercrime attempts, and access the fast-track reporting mainframe.
-                </p>
+          <div className="max-w-md mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-6 md:p-8 space-y-5" id="signup-screen">
+            <div className="border-b border-[var(--color-line)] pb-3 flex justify-between items-center">
+              <div>
+                <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase font-semibold">Nodal Onboarding</span>
+                <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Create Account</h3>
               </div>
-
-              <div className="space-y-2 text-[10px] text-[var(--color-ink-3)] font-mono border-t border-[var(--color-line)] pt-4">
-                <p>• Under the aegis of Cyber Swachhta Kendra</p>
-                <p>• Verified secure encryption standards</p>
-              </div>
+              <span className="text-[10px] text-[var(--color-navy)] font-mono">CERT-In Protocol</span>
             </div>
 
-            {/* Right form */}
-            <form onSubmit={handleRegSubmit} className="md:col-span-7 p-8 space-y-4" id="signup-form">
-              <h3 className="text-sm font-semibold uppercase tracking-wider text-[var(--color-ink)]">Citizen Registration</h3>
-              
+            <form onSubmit={handleRegSubmit} className="space-y-4" id="quick-signup-form" noValidate>
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Full Name</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Full Name *</label>
                 <div className="relative">
                   <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
                   <input
                     type="text"
-                    required
                     value={regForm.name}
-                    onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-                    className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, name: e.target.value });
+                      if (regErrors.name) setRegErrors({ ...regErrors, name: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.name ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="e.g. Inspector Rajesh Kumar"
                   />
                 </div>
+                {regErrors.name && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.name}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Mobile Connection (Linked with Aadhaar)</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Email *</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                  <input
+                    type="email"
+                    value={regForm.email}
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, email: e.target.value });
+                      if (regErrors.email) setRegErrors({ ...regErrors, email: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.email ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="e.g. rajesh.kumar@cert-in.gov.in"
+                  />
+                </div>
+                {regErrors.email && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.email}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Contact Phone *</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
                   <input
                     type="text"
-                    required
                     value={regForm.phone}
-                    onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
-                    className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, phone: e.target.value });
+                      if (regErrors.phone) setRegErrors({ ...regErrors, phone: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.phone ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="+91 98234 88392"
                   />
                 </div>
+                {regErrors.phone && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.phone}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Create Password</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Create Password *</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
                   <input
-                    type="password"
-                    required
+                    type={showRegPassword ? "text" : "password"}
                     placeholder="••••••••"
                     value={regForm.password}
-                    onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
-                    className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, password: e.target.value });
+                      if (regErrors.password) setRegErrors({ ...regErrors, password: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.password ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-10 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowRegPassword(!showRegPassword)}
+                    className="absolute right-3 top-2.5 text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+                  >
+                    {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
+                {regErrors.password && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.password}
+                  </p>
+                )}
               </div>
 
               <div className="pt-2">
@@ -1339,7 +1513,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setActiveScreen("login")}
-                  className="text-[var(--color-navy)] hover:underline"
+                  className="text-[var(--color-navy)] hover:underline font-semibold"
                 >
                   Log in here
                 </button>
@@ -1349,17 +1523,35 @@ export default function App() {
         )}
 
         {/* ==========================================
-            SCREEN: REQUEST ACCESS / ROLE SELECTION
+            SCREEN: REQUEST ACCESS / ROLE SELECTION (STEP 1 OF 3)
            ========================================== */}
         {activeScreen === "request_access" && (
           <div className="max-w-3xl mx-auto space-y-6" id="request-access-screen">
+            {/* Multi-step progress bar */}
+            <div className="flex items-center justify-between max-w-md mx-auto mb-2 text-xs font-mono">
+              <div className="flex items-center gap-1.5 text-[var(--color-navy)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-navy)] text-white flex items-center justify-center text-[10px]">1</span>
+                <span>Select Role</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-line)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-ink-3)]">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center text-[10px]">2</span>
+                <span>Details</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-line)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-ink-3)]">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center text-[10px]">3</span>
+                <span>Verification</span>
+              </div>
+            </div>
+
             <div className="text-center space-y-2">
-              <span className="text-[9px] font-mono font-semibold tracking-widest text-[var(--color-navy)] uppercase bg-[var(--color-navy-tint)] px-2 py-0.5 rounded">
-                Credentials Setup
+              <span className="text-[9px] font-mono font-semibold tracking-widest text-[var(--color-navy)] uppercase bg-[var(--color-navy-tint)] px-2.5 py-0.5 rounded">
+                Credentials Setup &bull; Step 1 of 3
               </span>
               <h2 className="text-xl md:text-2xl font-semibold text-[var(--color-ink)]">Request Professional Security Access</h2>
               <p className="text-xs text-[var(--color-ink-2)] max-w-md mx-auto">
-                Access to the live threat database, network intelligence tool, and currency scanner is strictly regulated. Please select your official role.
+                Access to live threat analysis, network disruption engine, and currency forensics is strictly regulated under CERT-In guidelines. Select your official capacity:
               </p>
             </div>
 
@@ -1367,20 +1559,20 @@ export default function App() {
               {[
                 {
                   id: "officer",
-                  title: "Law Enforcement",
-                  desc: "Police officers, investigators, and intelligence agencies tracing cyber crime trails.",
+                  title: "Law Enforcement Officer",
+                  desc: "Police officers, cyber investigators, and nodal intelligence agencies tracing cyber crime trails.",
                   icon: Shield
                 },
                 {
                   id: "bank_rep",
-                  title: "Bank / Financial Rep",
-                  desc: "Nodal bank officers and fraud clearance teams managing account freezes.",
+                  title: "Bank Nodal Representative",
+                  desc: "Nodal bank officers and fraud clearance teams managing instant account freezes under 1930 protocol.",
                   icon: Building
                 },
                 {
                   id: "admin",
-                  title: "Portal Administrator",
-                  desc: "CERT-In systems admins managing threat database registrations.",
+                  title: "CERT-In Administrator",
+                  desc: "CERT-In systems admins managing national threat database registrations & officer approvals.",
                   icon: Sliders
                 }
               ].map((role) => (
@@ -1392,22 +1584,25 @@ export default function App() {
                     setActiveScreen("your_details");
                     addAuditLog(`Role configuration selected: ${role.title}`);
                   }}
-                  className="bg-[var(--color-paper)] border border-[var(--color-line)] hover:border-[var(--color-line)] p-5 rounded-[3px] cursor-pointer text-center space-y-3 transition-all"
+                  className={`bg-[var(--color-paper)] border ${selectedRole === role.id ? "border-[var(--color-navy)] ring-1 ring-[var(--color-navy)]" : "border-[var(--color-line)] hover:border-[var(--color-navy)]"} p-5 rounded-[3px] cursor-pointer text-center space-y-3 transition-all`}
                 >
                   <div className="w-10 h-10 rounded-full bg-[var(--color-navy-tint)] text-[var(--color-navy)] flex items-center justify-center mx-auto">
                     <role.icon className="w-5 h-5" />
                   </div>
                   <h4 className="font-semibold text-[var(--color-ink)] text-xs uppercase">{role.title}</h4>
                   <p className="text-[11px] text-[var(--color-ink-2)] leading-relaxed">{role.desc}</p>
+                  <span className="inline-block text-[10px] text-[var(--color-navy)] font-semibold font-mono hover:underline pt-1">
+                    Select Profile &rarr;
+                  </span>
                 </div>
               ))}
             </div>
 
-            <div className="text-center">
+            <div className="text-center pt-2">
               <button
                 id="request-back-btn"
                 onClick={() => setActiveScreen("landing")}
-                className="text-[11px] text-[var(--color-ink-3)] hover:text-[var(--color-ink-2)] underline font-mono cursor-pointer"
+                className="text-[11px] text-[var(--color-ink-3)] hover:text-[var(--color-ink)] underline font-mono cursor-pointer"
               >
                 Return to general portal
               </button>
@@ -1420,60 +1615,205 @@ export default function App() {
            ========================================== */}
         {activeScreen === "your_details" && (
           <div className="max-w-xl mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-6 md:p-8 space-y-5" id="details-screen">
+            {/* Multi-step progress bar */}
+            <div className="flex items-center justify-between max-w-md mx-auto mb-2 text-xs font-mono">
+              <div className="flex items-center gap-1.5 text-[var(--color-safe)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-safe-tint)] text-[var(--color-safe)] flex items-center justify-center text-[10px]"><Check className="w-3 h-3" /></span>
+                <span>Role Selected</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-navy)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-navy)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-navy)] text-white flex items-center justify-center text-[10px]">2</span>
+                <span>Credentials</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-line)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-ink-3)]">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-paper)] border border-[var(--color-line)] flex items-center justify-center text-[10px]">3</span>
+                <span>Verification</span>
+              </div>
+            </div>
+
             <div className="border-b border-[var(--color-line)] pb-3 flex justify-between items-center">
               <div>
-                <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase">Step 2 of 3</span>
-                <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Professional Credentials</h3>
+                <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase font-semibold">Step 2 of 3</span>
+                <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Nodal Professional Credentials</h3>
               </div>
-              <span className="text-[10px] bg-[var(--color-paper)] px-2 py-0.5 rounded font-mono text-[var(--color-ink-2)] uppercase tracking-wide">
+              <span className="text-[10px] bg-[var(--color-navy-tint)] text-[var(--color-navy)] px-2 py-0.5 rounded font-mono font-semibold uppercase tracking-wide">
                 Role: {selectedRole.replace("_", " ")}
               </span>
             </div>
 
-            <form onSubmit={handleRegSubmit} className="space-y-4" id="details-form">
+            <form onSubmit={handleRegSubmit} className="space-y-4" id="details-form" noValidate>
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  value={regForm.name}
-                  onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-                  className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
-                />
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Full Name *</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                  <input
+                    type="text"
+                    value={regForm.name}
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, name: e.target.value });
+                      if (regErrors.name) setRegErrors({ ...regErrors, name: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.name ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="e.g. Inspector Rajesh Kumar"
+                  />
+                </div>
+                {regErrors.name && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.name}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Organisation</label>
-                <input
-                  type="text"
-                  required
-                  value={regForm.organisation}
-                  onChange={(e) => setRegForm({ ...regForm, organisation: e.target.value })}
-                  className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
-                  placeholder="e.g. State Bank of India Nodal Cell, Delhi Police"
-                />
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Email Address *</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                  <input
+                    type="email"
+                    value={regForm.email}
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, email: e.target.value });
+                      if (regErrors.email) setRegErrors({ ...regErrors, email: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.email ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="e.g. rajesh.kumar@cert-in.gov.in"
+                  />
+                </div>
+                {regErrors.email && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.email}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Government/Employee ID</label>
-                <input
-                  type="text"
-                  required
-                  value={regForm.employeeId}
-                  onChange={(e) => setRegForm({ ...regForm, employeeId: e.target.value })}
-                  className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
-                />
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Organisation *</label>
+                <div className="relative">
+                  <Building className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                  <input
+                    type="text"
+                    value={regForm.organisation}
+                    onChange={(e) => {
+                      setRegForm({ ...regForm, organisation: e.target.value });
+                      if (regErrors.organisation) setRegErrors({ ...regErrors, organisation: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${regErrors.organisation ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="e.g. Delhi Police Cyber Crime Unit"
+                  />
+                </div>
+                {regErrors.organisation && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {regErrors.organisation}
+                  </p>
+                )}
               </div>
 
-              <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Contact Phone</label>
-                <input
-                  type="text"
-                  required
-                  value={regForm.phone}
-                  onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
-                  className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Government / Employee ID *</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                    <input
+                      type="text"
+                      value={regForm.employeeId}
+                      onChange={(e) => {
+                        setRegForm({ ...regForm, employeeId: e.target.value });
+                        if (regErrors.employeeId) setRegErrors({ ...regErrors, employeeId: undefined });
+                      }}
+                      className={`w-full bg-[var(--color-paper)] border ${regErrors.employeeId ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                      placeholder="e.g. DP-2024-8839"
+                    />
+                  </div>
+                  {regErrors.employeeId && (
+                    <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                      <AlertCircle className="w-3 h-3" /> {regErrors.employeeId}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Contact Phone Number *</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                    <input
+                      type="text"
+                      value={regForm.phone}
+                      onChange={(e) => {
+                        setRegForm({ ...regForm, phone: e.target.value });
+                        if (regErrors.phone) setRegErrors({ ...regErrors, phone: undefined });
+                      }}
+                      className={`w-full bg-[var(--color-paper)] border ${regErrors.phone ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                      placeholder="+91 98234 88392"
+                    />
+                  </div>
+                  {regErrors.phone && (
+                    <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                      <AlertCircle className="w-3 h-3" /> {regErrors.phone}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Password *</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                    <input
+                      type={showRegPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={regForm.password}
+                      onChange={(e) => {
+                        setRegForm({ ...regForm, password: e.target.value });
+                        if (regErrors.password) setRegErrors({ ...regErrors, password: undefined });
+                      }}
+                      className={`w-full bg-[var(--color-paper)] border ${regErrors.password ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-10 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRegPassword(!showRegPassword)}
+                      className="absolute right-3 top-2.5 text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+                    >
+                      {showRegPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {regErrors.password && (
+                    <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                      <AlertCircle className="w-3 h-3" /> {regErrors.password}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Confirm Password *</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={regForm.confirmPassword}
+                      onChange={(e) => {
+                        setRegForm({ ...regForm, confirmPassword: e.target.value });
+                        if (regErrors.confirmPassword) setRegErrors({ ...regErrors, confirmPassword: undefined });
+                      }}
+                      className={`w-full bg-[var(--color-paper)] border ${regErrors.confirmPassword ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-10 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-2.5 text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {regErrors.confirmPassword && (
+                    <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                      <AlertCircle className="w-3 h-3" /> {regErrors.confirmPassword}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="pt-3 border-t border-[var(--color-line)]/60 flex gap-3">
@@ -1487,9 +1827,10 @@ export default function App() {
                 <button
                   id="details-submit-btn"
                   type="submit"
-                  className="flex-1 py-2 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer"
+                  className="flex-1 py-2 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer flex items-center justify-center gap-1"
                 >
-                  Continue to Step 3
+                  <span>Continue to Step 3</span>
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </form>
@@ -1501,54 +1842,122 @@ export default function App() {
            ========================================== */}
         {activeScreen === "final_verification" && (
           <div className="max-w-xl mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-6 md:p-8 space-y-5" id="final-verification-screen">
-            <div className="border-b border-[var(--color-line)] pb-3">
-              <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase">Step 3 of 3</span>
-              <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Official Document & OTP Code Validation</h3>
+            {/* Multi-step progress bar */}
+            <div className="flex items-center justify-between max-w-md mx-auto mb-2 text-xs font-mono">
+              <div className="flex items-center gap-1.5 text-[var(--color-safe)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-safe-tint)] text-[var(--color-safe)] flex items-center justify-center text-[10px]"><Check className="w-3 h-3" /></span>
+                <span>Role Selected</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-safe)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-safe)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-safe-tint)] text-[var(--color-safe)] flex items-center justify-center text-[10px]"><Check className="w-3 h-3" /></span>
+                <span>Credentials Validated</span>
+              </div>
+              <div className="h-0.5 flex-1 mx-2 bg-[var(--color-navy)]" />
+              <div className="flex items-center gap-1.5 text-[var(--color-navy)] font-semibold">
+                <span className="w-5 h-5 rounded-full bg-[var(--color-navy)] text-white flex items-center justify-center text-[10px]">3</span>
+                <span>Verification</span>
+              </div>
             </div>
 
-            <form onSubmit={handleVerificationSubmit} className="space-y-4" id="final-verify-form">
+            <div className="border-b border-[var(--color-line)] pb-3">
+              <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase font-semibold">Step 3 of 3</span>
+              <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Official Document Upload & 6-Digit OTP Code</h3>
+            </div>
+
+            <form onSubmit={handleVerificationSubmit} className="space-y-4" id="final-verify-form" noValidate>
               {/* Document Upload Area */}
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1.5">Official Nodal Authorization Document (PDF/ID Photo)</label>
-                <div className="border border-dashed border-[var(--color-line)] hover:border-[var(--color-line)] bg-[var(--color-paper)] rounded-[3px] p-5 text-center transition-all">
-                  <Mail className="w-6 h-6 text-[var(--color-ink-3)] mx-auto mb-1" />
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1.5">Official Nodal Authorization Document (PDF/ID Certificate) *</label>
+                <div className={`border-2 border-dashed ${verifyErrors.doc ? "border-[var(--color-danger)] bg-[var(--color-danger-tint)]" : "border-[var(--color-line)] hover:border-[var(--color-navy)] bg-[var(--color-paper)]"} rounded-[3px] p-5 text-center transition-all`}>
+                  <UploadCloud className="w-8 h-8 text-[var(--color-navy)] mx-auto mb-1.5" />
                   {uploadedIdName ? (
-                    <span className="text-xs text-[var(--color-ink)] font-semibold block">{uploadedIdName}</span>
+                    <div className="space-y-1">
+                      <span className="text-xs text-[var(--color-safe)] font-semibold flex items-center justify-center gap-1">
+                        <CheckCircle2 className="w-4 h-4" /> {uploadedIdName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setUploadedIdName(null)}
+                        className="text-[10px] text-[var(--color-danger)] hover:underline block mx-auto"
+                      >
+                        Remove file & re-upload
+                      </button>
+                    </div>
                   ) : (
                     <>
                       <button
                         type="button"
-                        onClick={() => setUploadedIdName("Nodal_Authorization_Cert_CERT-In.pdf")}
-                        className="text-xs text-[var(--color-navy)] font-semibold hover:underline cursor-pointer"
+                        onClick={() => {
+                          setUploadedIdName("Nodal_Authorization_Cert_CERT-In.pdf");
+                          if (verifyErrors.doc) setVerifyErrors({ ...verifyErrors, doc: undefined });
+                        }}
+                        className="text-xs text-[var(--color-navy)] font-semibold hover:underline cursor-pointer block mx-auto"
                       >
-                        Click to upload credential ID certificate
+                        Click to upload official nodal authorization PDF
                       </button>
-                      <span className="text-[10px] text-[var(--color-ink-3)] block mt-1">PDF, JPG up to 10MB</span>
+                      <span className="text-[10px] text-[var(--color-ink-3)] block mt-1">PDF, PNG, JPG up to 10MB</span>
                     </>
                   )}
                 </div>
+                {verifyErrors.doc && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {verifyErrors.doc}
+                  </p>
+                )}
               </div>
 
-              {/* OTP Input Fields */}
+              {/* OTP Input Fields with auto-focus */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase">Enter 6-Digit Nodal OTP Passcode</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase">Enter 6-Digit Security OTP Passcode *</label>
                 <div className="flex justify-between gap-2 max-w-sm" id="otp-input-row">
                   {otpCodes.map((code, idx) => (
                     <input
                       key={idx}
+                      id={`otp-input-${idx}`}
                       type="text"
                       maxLength={1}
                       value={code}
                       onChange={(e) => {
+                        const val = e.target.value.replace(/[^0-9]/g, "");
                         const newCodes = [...otpCodes];
-                        newCodes[idx] = e.target.value;
+                        newCodes[idx] = val;
                         setOtpCodes(newCodes);
+                        if (verifyErrors.otp) setVerifyErrors({ ...verifyErrors, otp: undefined });
+                        if (val && idx < 5) {
+                          const nextInput = document.getElementById(`otp-input-${idx + 1}`);
+                          nextInput?.focus();
+                        }
                       }}
-                      className="w-10 h-10 bg-[var(--color-paper)] border border-[var(--color-line)] text-center text-sm font-semibold text-[var(--color-ink)] outline-none rounded focus:border-[var(--color-line)] font-mono"
+                      onKeyDown={(e) => {
+                        if (e.key === "Backspace" && !otpCodes[idx] && idx > 0) {
+                          const prevInput = document.getElementById(`otp-input-${idx - 1}`);
+                          prevInput?.focus();
+                        }
+                      }}
+                      className={`w-10 h-11 bg-[var(--color-paper)] border ${verifyErrors.otp ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} text-center text-sm font-bold text-[var(--color-ink)] outline-none rounded focus:border-[var(--color-navy)] font-mono`}
                     />
                   ))}
                 </div>
-                <p className="text-[10px] text-[var(--color-ink-3)]">A security verification passcode was sent to official email credentials.</p>
+                {verifyErrors.otp ? (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {verifyErrors.otp}
+                  </p>
+                ) : (
+                  <div className="flex justify-between items-center text-[10px] text-[var(--color-ink-3)]">
+                    <span>Passcode sent to official email credentials.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpCodes(["9", "8", "2", "3", "4", "1"]);
+                        addAuditLog("Demonstration OTP passcode auto-filled: 982341");
+                      }}
+                      className="text-[var(--color-navy)] hover:underline font-mono"
+                    >
+                      Fill Demo OTP (982341)
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="pt-3 border-t border-[var(--color-line)]/60 flex gap-3">
@@ -1576,28 +1985,29 @@ export default function App() {
            ========================================== */}
         {activeScreen === "success" && (
           <div className="max-w-md mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-6 md:p-8 text-center space-y-4" id="submitted-success-screen">
-            <div className="w-12 h-12 bg-[var(--color-safe-tint)] text-[var(--color-safe)] rounded-full flex items-center justify-center mx-auto">
-              <ShieldCheck className="w-6 h-6" />
+            <div className="w-14 h-14 bg-[var(--color-safe-tint)] text-[var(--color-safe)] rounded-full flex items-center justify-center mx-auto">
+              <ShieldCheck className="w-8 h-8" />
             </div>
             
-            <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase tracking-wide">Request Submitted Under Review</h3>
+            <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase tracking-wide">Nodal Request Submitted Under Review</h3>
             <p className="text-xs text-[var(--color-ink-2)] leading-relaxed">
-              Our regional CERT-In credentials committee verifies nodal profiles within 4 working hours.
+              Our regional CERT-In credentials committee verifies nodal profiles within 4 working hours under official protocol.
             </p>
 
-            <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3 text-left text-[11px] text-[var(--color-ink-2)] space-y-1">
-              <p><span className="font-semibold text-[var(--color-ink-2)]">Name:</span> {regForm.name}</p>
-              <p><span className="font-semibold text-[var(--color-ink-2)]">Organisation:</span> {regForm.organisation}</p>
-              <p><span className="font-semibold text-[var(--color-ink-2)]">Aadhaar Handset Link:</span> Linked</p>
+            <div className="bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-3 text-left text-[11px] text-[var(--color-ink-2)] space-y-1 font-mono">
+              <p><span className="font-semibold text-[var(--color-ink)]">Nodal Official:</span> {regForm.name}</p>
+              <p><span className="font-semibold text-[var(--color-ink)]">Email:</span> {regForm.email}</p>
+              <p><span className="font-semibold text-[var(--color-ink)]">Organisation:</span> {regForm.organisation}</p>
+              <p><span className="font-semibold text-[var(--color-ink)]">Status:</span> <span className="text-[var(--color-warning)] font-bold">PENDING APPROVAL</span></p>
             </div>
 
             <div className="pt-2">
               <button
                 id="success-login-btn"
                 onClick={handleLogin}
-                className="w-full py-2 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer"
+                className="w-full py-2.5 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer"
               >
-                Launch Professional Command Console
+                Launch Sovereign Command Console
               </button>
             </div>
           </div>
@@ -1610,30 +2020,30 @@ export default function App() {
           <div className="max-w-xl mx-auto bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] p-6 md:p-8 space-y-5" id="login-screen">
             <div className="border-b border-[var(--color-line)] pb-3 flex justify-between items-center">
               <div>
-                <span className="text-[9px] font-mono text-[var(--color-ink-3)] uppercase">Authorized Portal</span>
-                <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Welcome back</h3>
+                <span className="text-[9px] font-mono text-[var(--color-navy)] uppercase font-semibold">Authorized Portal</span>
+                <h3 className="font-semibold text-[var(--color-ink)] text-sm uppercase">Sovereign Sign In</h3>
               </div>
-              <span className="text-[10px] text-[var(--color-navy)] font-mono">CERT-In Secured</span>
+              <span className="text-[10px] text-[var(--color-navy)] font-mono bg-[var(--color-navy-tint)] px-2 py-0.5 rounded font-semibold">CERT-In Protocol</span>
             </div>
 
             {/* Quick role selection tabs */}
             <div>
-              <span className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-2">Select Investigator Profile</span>
+              <span className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-2">Select Account Profile</span>
               <div className="grid grid-cols-4 gap-2">
                 {[
-                  { id: "citizen", label: "Citizen" },
                   { id: "officer", label: "Officer" },
                   { id: "bank_rep", label: "Bank Rep" },
-                  { id: "admin", label: "Admin" }
+                  { id: "admin", label: "Admin" },
+                  { id: "citizen", label: "Citizen" }
                 ].map((role) => (
                   <button
                     key={role.id}
                     type="button"
-                    onClick={() => setSelectedRole(role.id as any)}
-                    className={`py-1.5 rounded border font-mono text-[10px] text-center transition-all ${
-                      selectedRole === role.id
-                        ? "bg-[var(--color-surface-2)] border-[var(--color-line)] text-[var(--color-ink)]"
-                        : "bg-[var(--color-paper)] border-[var(--color-line)] hover:border-[var(--color-line)] text-[var(--color-ink-3)]"
+                    onClick={() => handleSelectLoginRole(role.id as any)}
+                    className={`py-2 rounded border font-mono text-[10px] text-center transition-all cursor-pointer ${
+                      loginRole === role.id
+                        ? "bg-[var(--color-navy)] border-[var(--color-navy)] text-white font-semibold shadow-sm"
+                        : "bg-[var(--color-paper)] border-[var(--color-line)] hover:border-[var(--color-navy)] text-[var(--color-ink-2)]"
                     }`}
                   >
                     {role.label}
@@ -1642,48 +2052,83 @@ export default function App() {
               </div>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-4" id="login-form">
+            <form onSubmit={handleLogin} className="space-y-4" id="login-form" noValidate>
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Email / ID</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Official Nodal Email Address *</label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
                   <input
                     type="email"
-                    required
-                    value={regForm.employeeId ? `${regForm.name.toLowerCase().replace(" ", ".")}@govt.in` : "arjun.singh@cert-in.gov.in"}
-                    onChange={(e) => setRegForm({ ...regForm, name: e.target.value })}
-                    className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
+                    value={loginEmail}
+                    onChange={(e) => {
+                      setLoginEmail(e.target.value);
+                      if (loginErrors.email) setLoginErrors({ ...loginErrors, email: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${loginErrors.email ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
+                    placeholder="name@govt.in"
                   />
                 </div>
+                {loginErrors.email && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {loginErrors.email}
+                  </p>
+                )}
               </div>
 
               <div>
-                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Passcode Credential</label>
+                <label className="block text-[10px] font-mono text-[var(--color-ink-3)] uppercase mb-1">Passcode Credential *</label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--color-ink-3)]" />
                   <input
-                    type="password"
-                    required
+                    type={showLoginPassword ? "text" : "password"}
                     placeholder="••••••••"
-                    value={regForm.password}
-                    onChange={(e) => setRegForm({ ...regForm, password: e.target.value })}
-                    className="w-full bg-[var(--color-paper)] border border-[var(--color-line)] rounded-[3px] pl-10 pr-4 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-line)]"
+                    value={loginPassword}
+                    onChange={(e) => {
+                      setLoginPassword(e.target.value);
+                      if (loginErrors.password) setLoginErrors({ ...loginErrors, password: undefined });
+                    }}
+                    className={`w-full bg-[var(--color-paper)] border ${loginErrors.password ? "border-[var(--color-danger)]" : "border-[var(--color-line)]"} rounded-[3px] pl-10 pr-10 py-2 text-xs text-[var(--color-ink)] outline-none focus:border-[var(--color-navy)]`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-3 top-2.5 text-[var(--color-ink-3)] hover:text-[var(--color-ink)] cursor-pointer"
+                  >
+                    {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
+                {loginErrors.password && (
+                  <p className="text-[10px] text-[var(--color-danger)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3 h-3" /> {loginErrors.password}
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-between items-center text-[10px] font-mono text-[var(--color-ink-2)]">
-                <button type="button" className="hover:underline">Forgot password?</button>
-                <button type="button" onClick={() => setActiveScreen("request_access")} className="text-[var(--color-navy)] hover:underline font-semibold">Request Nodal Credentials</button>
+                <button
+                  type="button"
+                  onClick={() => alert("Passcode recovery link sent to official credentials inbox.")}
+                  className="hover:underline text-[var(--color-ink-3)]"
+                >
+                  Forgot password?
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveScreen("request_access")}
+                  className="text-[var(--color-navy)] hover:underline font-semibold"
+                >
+                  Request Nodal Credentials &rarr;
+                </button>
               </div>
 
               <div className="pt-2">
                 <button
                   id="login-submit-btn"
                   type="submit"
-                  className="w-full py-2.5 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer"
+                  className="w-full py-2.5 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white font-semibold rounded-[3px] text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
                 >
-                  Sovereign Sign In
+                  <span>Sovereign Sign In</span>
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </form>
