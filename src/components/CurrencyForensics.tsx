@@ -128,6 +128,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
       console.warn("API endpoint failed, utilizing client-side RBI forensic engine:", err?.message);
       const fallbackData = getFallbackAnalysis(noteId);
       setAnalysisResult(fallbackData);
+      setErrorMsg(null);
       onAddAuditLog(`Client forensic scan completed for Serial No ${fallbackData.serialNo}. Verdict: ${fallbackData.isValid ? "Genuine" : "Counterfeit Warn"}`);
     } finally {
       setIsLoading(false);
@@ -156,6 +157,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
             const data = await response.json();
             if (isValidAnalysis(data)) {
               setAnalysisResult(data);
+              setErrorMsg(null);
               setSelectedNote({
                 id: "custom_note",
                 name: "Uploaded Custom Banknote",
@@ -173,6 +175,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
           console.warn("Custom upload server API failed, using client RBI engine fallback:", err?.message);
           const fallbackData = getFallbackAnalysis("custom_note");
           setAnalysisResult(fallbackData);
+          setErrorMsg(null);
           setSelectedNote({
             id: "custom_note",
             name: "Uploaded Custom Banknote",
@@ -261,7 +264,7 @@ export default function CurrencyForensics({ onAddAuditLog }: CurrencyForensicsPr
           </button>
         </div>
 
-        {errorMsg && (
+        {!analysisResult && errorMsg && (
           <div className="bg-[var(--color-critical-tint)] border border-[var(--color-line)] rounded-[3px] p-4 flex items-start gap-3" id="currency-error-banner">
             <AlertTriangle className="w-5 h-5 text-[var(--color-critical)] shrink-0 mt-0.5" />
             <div>
