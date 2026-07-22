@@ -1,0 +1,6 @@
+Caller: Hello, I am calling from HDFC Bank regarding your recent transaction.
+Victim: Yes?
+Caller: We noticed a large transfer of funds from your account number. Was this authorized by you?
+Victim: Yes, I transferred the amount to my brother.
+Caller: Okay, we just wanted to do a quick verification to keep your account safe. Thank you.
+Victim: Thank you.

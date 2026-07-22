@@ -14,7 +14,7 @@ export const SCREEN_PATHS: Record<ScreenType, string> = {
   final_verification: "/request-access/verify",
   success: "/request-access/submitted",
   dashboard: "/command-centre",
-  scam_analyser: "/scam-analyser",
+  kavach: "/scam-analyser",
   currency_detector: "/currency-forensics",
   network_intel: "/network-intelligence",
   ai_assistant: "/ai-advisor",

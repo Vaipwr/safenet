@@ -194,54 +194,103 @@ Detect if it is a scam call (phishing, social engineering, impersonation, etc.),
 Transcript:
 "${transcript}"`;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              riskScore: { type: Type.INTEGER, description: "Threat / Scam risk score from 0 to 100" },
-              riskLevel: { type: Type.STRING, description: "CRITICAL, HIGH, MEDIUM, or LOW" },
-              scamType: { type: Type.STRING, description: "Specific Indian scam class (e.g., Telecom KYC Suspension, KBC Lottery Fraud, Customs Narcotics Drug Package, Part-time Job WhatsApp Trap, Digital Arrest Impersonation)" },
-              confidence: { type: Type.INTEGER, description: "Confidence score of detection (0-100)" },
-              englishTranscript: { type: Type.STRING, description: "A high-fidelity English translation or synthesis of the conversation" },
-              highlights: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    text: { type: Type.STRING, description: "Exact sentence or word pattern in the transcript that is highly suspicious" },
-                    reason: { type: Type.STRING, description: "Technical social engineering tactic being used (e.g., artificial urgency, official credential impersonation, baiting, intimidating bank account freeze warning)" },
-                    severity: { type: Type.STRING, description: "high, medium, or low" }
-                  },
-                  required: ["text", "reason", "severity"]
+      let response;
+      try {
+        response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                riskScore: { type: Type.INTEGER, description: "Threat / Scam risk score from 0 to 100" },
+                riskLevel: { type: Type.STRING, description: "CRITICAL, HIGH, MEDIUM, or LOW" },
+                scamType: { type: Type.STRING, description: "Specific Indian scam class (e.g., Telecom KYC Suspension, KBC Lottery Fraud, Customs Narcotics Drug Package, Part-time Job WhatsApp Trap, Digital Arrest Impersonation)" },
+                confidence: { type: Type.INTEGER, description: "Confidence score of detection (0-100)" },
+                englishTranscript: { type: Type.STRING, description: "A high-fidelity English translation or synthesis of the conversation" },
+                highlights: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING, description: "Exact sentence or word pattern in the transcript that is highly suspicious" },
+                      reason: { type: Type.STRING, description: "Technical social engineering tactic being used (e.g., artificial urgency, official credential impersonation, baiting, intimidating bank account freeze warning)" },
+                      severity: { type: Type.STRING, description: "high, medium, or low" }
+                    },
+                    required: ["text", "reason", "severity"]
+                  }
+                },
+                actions: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Immediate action points (e.g., Report on National Cyber Crime Portal Cybercrime.gov.in, Dial Helpline 1930, Freeze bank account immediately)"
+                },
+                cases: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      caseId: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      similarity: { type: Type.STRING, description: "Similarity match percentage e.g. 92%" },
+                      status: { type: Type.STRING }
+                    },
+                    required: ["caseId", "title", "similarity", "status"]
+                  }
                 }
               },
-              actions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Immediate action points (e.g., Report on National Cyber Crime Portal Cybercrime.gov.in, Dial Helpline 1930, Freeze bank account immediately)"
-              },
-              cases: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    caseId: { type: Type.STRING },
-                    title: { type: Type.STRING },
-                    similarity: { type: Type.STRING, description: "Similarity match percentage e.g. 92%" },
-                    status: { type: Type.STRING }
-                  },
-                  required: ["caseId", "title", "similarity", "status"]
-                }
-              }
-            },
-            required: ["riskScore", "riskLevel", "scamType", "confidence", "highlights", "actions", "cases"]
+              required: ["riskScore", "riskLevel", "scamType", "confidence", "highlights", "actions", "cases"]
+            }
           }
-        }
-      });
+        });
+      } catch (err: any) {
+        console.warn("Primary model gemini-2.5-flash busy/failed, using gemini-1.5-flash fallback:", err.message);
+        response = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                riskScore: { type: Type.INTEGER },
+                riskLevel: { type: Type.STRING },
+                scamType: { type: Type.STRING },
+                confidence: { type: Type.INTEGER },
+                englishTranscript: { type: Type.STRING },
+                highlights: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING },
+                      reason: { type: Type.STRING },
+                      severity: { type: Type.STRING }
+                    },
+                    required: ["text", "reason", "severity"]
+                  }
+                },
+                actions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                cases: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      caseId: { type: Type.STRING },
+                      title: { type: Type.STRING },
+                      similarity: { type: Type.STRING },
+                      status: { type: Type.STRING }
+                    },
+                    required: ["caseId", "title", "similarity", "status"]
+                  }
+                }
+              },
+              required: ["riskScore", "riskLevel", "scamType", "confidence", "highlights", "actions", "cases"]
+            }
+          }
+        });
+      }
 
       const responseText = response.text;
       if (responseText) {
@@ -398,7 +447,7 @@ Provide a detailed forensic verification breakdown in the exact structured JSON 
       };
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: { parts: [imagePart, prompt] },
         config: {
           responseMimeType: "application/json",
@@ -496,7 +545,7 @@ app.post("/api/ai-assistant", async (req, res) => {
       const latestMessage = messages[messages.length - 1]?.text || "";
 
       const chat = ai.chats.create({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         config: {
           systemInstruction: `You are the CERT-In AI Cyber Security Assistant (SafeNet Specialist).
 Your purpose is to assist Indian citizens, police officers, bank representatives, and administrators with security guidelines, fraud investigation tactics, scam report protocols, and tech safety procedures (such as verifying UPI IDs, malicious APK analysis, fishing websites, and reporting under 1930 Cyber helpline).
@@ -586,7 +635,7 @@ app.post("/api/citizen-check", async (req, res) => {
   if (!isMatch && ai) {
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: `You are a Cyber Security Domain Analyst at CERT-In.
 Evaluate the safety of this query: "${cleanQuery}" (Type: ${type}).
 Identify if this looks like a phishing URL, scam UPI handle, or typical caller ID format for fraud.
@@ -630,6 +679,121 @@ Provide response in strict JSON:
 });
 
 // ==========================================
+// 4.5. Multimodal Real-Time Threat Predictor
+// ==========================================
+app.post("/api/analyze-multimodal", async (req, res) => {
+  const { inputType, textData, imageBase64, mimeType, entityType, entityValue, language } = req.body;
+
+  if (ai) {
+    try {
+      const parts: any[] = [];
+
+      if (inputType === "screenshot" && imageBase64) {
+        const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "");
+        parts.push({
+          inlineData: {
+            data: cleanBase64,
+            mimeType: mimeType || "image/png"
+          }
+        });
+        parts.push(`You are a Lead Cyber Forensic Threat Specialist at CERT-In.
+Inspect this screenshot image for cyber threats, phishing traps, fake arrest notices, or social engineering extortion.
+Extract all visible text, predict threat risk score (0-100), identify scam category, highlight suspicious phrases, list red flags, and provide emergency security actions.`);
+      } else if (inputType === "entity") {
+        parts.push(`You are a Cyber Security Threat Intelligence Analyst at CERT-In.
+Perform a real-time risk assessment and threat prediction for this target:
+Type: ${entityType?.toUpperCase() || "TARGET"}
+Value: "${entityValue || textData}"
+
+Predict if this URL is a phishing domain/fake government portal, if this phone number is a flagged scammer ID, or if this UPI handle belongs to a mule account.
+Provide risk score (0-100), risk level (CRITICAL, HIGH, MEDIUM, LOW), scam category, highlights, red flags, and preventive actions.`);
+      } else {
+        parts.push(`You are an expert Anti-Fraud Investigator at CERT-In.
+Perform a real-time threat analysis and prediction on this call transcript / voice content (Language: ${language || "English"}):
+"${textData}"
+
+Identify scam classification, predict risk score (0-100), risk level (CRITICAL, HIGH, MEDIUM, LOW), list highlighted suspicious phrases with social engineering explanations, list tactical red flags, and provide emergency advice.`);
+      }
+
+      const responseSchema = {
+        type: Type.OBJECT,
+        properties: {
+          extractedText: { type: Type.STRING, description: "Extracted text or summary of analyzed content" },
+          riskScore: { type: Type.INTEGER, description: "Threat risk score 0 to 100" },
+          riskLevel: { type: Type.STRING, description: "CRITICAL, HIGH, MEDIUM, or LOW" },
+          scamType: { type: Type.STRING, description: "Specific scam classification" },
+          confidence: { type: Type.INTEGER, description: "Confidence percentage 0 to 100" },
+          highlights: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                text: { type: Type.STRING },
+                reason: { type: Type.STRING },
+                severity: { type: Type.STRING }
+              },
+              required: ["text", "reason", "severity"]
+            }
+          },
+          redFlags: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                detail: { type: Type.STRING },
+                status: { type: Type.STRING }
+              },
+              required: ["title", "detail", "status"]
+            }
+          },
+          actions: { type: Type.ARRAY, items: { type: Type.STRING } },
+          cases: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                caseId: { type: Type.STRING },
+                title: { type: Type.STRING },
+                similarity: { type: Type.STRING },
+                status: { type: Type.STRING }
+              },
+              required: ["caseId", "title", "similarity", "status"]
+            }
+          }
+        },
+        required: ["riskScore", "riskLevel", "scamType", "confidence", "highlights", "redFlags", "actions", "cases"]
+      };
+
+      let resultResponse;
+      try {
+        resultResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: parts,
+          config: { responseMimeType: "application/json", responseSchema }
+        });
+      } catch (err: any) {
+        console.warn("Multimodal primary model busy, attempting gemini-1.5-flash fallback:", err.message);
+        resultResponse = await ai.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: parts,
+          config: { responseMimeType: "application/json", responseSchema }
+        });
+      }
+
+      if (resultResponse && resultResponse.text) {
+        const parsed = JSON.parse(resultResponse.text.trim());
+        return res.json(parsed);
+      }
+    } catch (e: any) {
+      console.error("Multimodal Real-Time Threat Analysis failed:", e.message);
+    }
+  }
+
+  res.status(500).json({ error: "AI threat prediction unavailable" });
+});
+
+// ==========================================
 // 5. API Endpoint: JAAL Fraud Network Intelligence
 // ==========================================
 app.get("/api/jaal/graph", (_req, res) => {
@@ -645,6 +809,7 @@ app.post("/api/jaal/disrupt", (req, res) => {
 
 // ==========================================
 // 6. Serve Vite Middleware or Static Files
+// ==========================================
 // ==========================================
 async function bootstrap() {
   if (process.env.NODE_ENV !== "production") {
@@ -662,7 +827,7 @@ async function bootstrap() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`SafeNet AI server running on http://0.0.0.0:${PORT}`);
+    console.log(`SafeNet AI server running on http://localhost:${PORT} (or http://127.0.0.1:${PORT})`);
   });
 }
 

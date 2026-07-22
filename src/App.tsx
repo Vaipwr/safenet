@@ -7,11 +7,11 @@ import { loadSession, saveSession, clearSession, ANONYMOUS_SESSION } from "./ses
 
 // Component Imports
 import CommandCentre from "./components/CommandCentre";
-import ScamAnalyser from "./components/ScamAnalyser";
 import CurrencyForensics from "./components/CurrencyForensics";
 import NetworkIntelligence from "./components/NetworkIntelligence";
 import AISecurityAssistant from "./components/AISecurityAssistant";
 import CitizenPortal from "./components/CitizenPortal";
+import KavachDashboard from "./components/KavachDashboard";
 
 // Icons
 import {
@@ -129,7 +129,7 @@ export default function App() {
   // out lands on the login page rather than an empty viewport.
   const PROTECTED_SCREENS: ScreenType[] = [
     "dashboard",
-    "scam_analyser",
+    "kavach",
     "currency_detector",
     "network_intel",
     "ai_assistant",
@@ -403,7 +403,7 @@ export default function App() {
   }[] = session.isLoggedIn
     ? [
         { id: "tab-btn-dashboard", screen: "dashboard", label: "Command Centre", icon: Activity },
-        { id: "tab-btn-scam", screen: "scam_analyser", label: "Scam Analyser", icon: Phone },
+        { id: "tab-btn-scam", screen: "kavach" as ScreenType, label: "Scam Analyser", icon: Phone },
         { id: "tab-btn-currency", screen: "currency_detector", label: "Currency Forensics", icon: Coins },
         { id: "tab-btn-network", screen: "network_intel", label: "Network Intel", icon: Users },
         { id: "tab-btn-ai", screen: "ai_assistant", label: "AI Advisor", icon: Brain },
@@ -1698,10 +1698,13 @@ export default function App() {
         )}
 
         {/* ==========================================
-            SCREEN: SCAM CALL ANALYSER
+            SCREEN: KAVACH
            ========================================== */}
-        {activeScreen === "scam_analyser" && (
-          <ScamAnalyser onAddAuditLog={addAuditLog} />
+        {activeScreen === "kavach" && (
+          <KavachDashboard
+            onAddAuditLog={addAuditLog}
+            onNavigateToNetwork={() => setActiveScreen("network_intel")}
+          />
         )}
 
         {/* ==========================================

@@ -10,7 +10,7 @@ export type ScreenType =
   | "success"
   | "dashboard"
   | "currency_detector"
-  | "scam_analyser"
+  | "kavach"
   | "network_intel"
   | "citizen_portal"
   | "ai_assistant"

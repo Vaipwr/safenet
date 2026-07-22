@@ -1,0 +1,9 @@
+Caller: Hello, this is investigating officer from the Narcotics Control Bureau.
+Victim: Yes, how can I help?
+Caller: A package in your name was seized at customs. It contains illegal drugs and money laundering evidence. An arrest warrant has been issued.
+Victim: I haven't ordered anything! 
+Caller: Do not disconnect. You are under surveillance. Keep your camera on. 
+Victim: What should I do?
+Caller: To prove your innocence, you must make a security deposit to the RBI monitored account. It is fully refundable.
+Victim: Okay.
+Caller: Transfer the amount to this UPI VPA immediately: rbi.customs@sbi
