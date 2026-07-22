@@ -689,8 +689,60 @@ export default function App() {
       </aside>
 
       {/* 2. Main Content Canvas — offset by the collapsed rail width */}
-      <main className="pl-16" id="screen-viewport">
-       <div className="p-6 md:p-8 max-w-7xl w-full mx-auto">
+      <main className="pl-16 min-h-screen flex flex-col" id="screen-viewport">
+        {/* Top Navigation Control Bar with User Profile & Logout Option */}
+        <header className="h-14 border-b border-[var(--color-line)] bg-[var(--color-paper)]/90 backdrop-blur-md sticky top-0 z-40 px-6 flex justify-between items-center" id="top-header-bar">
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono font-semibold text-[var(--color-navy)] uppercase tracking-wider bg-[var(--color-navy-tint)] px-2.5 py-1 rounded">
+              {activeScreen.replace("_", " ").toUpperCase()}
+            </span>
+            <span className="hidden sm:inline-block text-[11px] text-[var(--color-ink-3)] font-mono">
+              CERT-In National Cyber Security Mainframe
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-[var(--color-safe-tint)] text-[var(--color-safe)] border border-[var(--color-line)] rounded-full text-[10px] font-mono font-semibold">
+              <span className="w-2 h-2 rounded-full bg-[var(--color-safe)] animate-pulse" />
+              <span>1930 Helpline Active</span>
+            </div>
+
+            {session.isLoggedIn ? (
+              <div className="flex items-center gap-3 border-l border-[var(--color-line)] pl-3">
+                <div className="text-right hidden sm:block leading-tight">
+                  <span className="text-xs font-semibold text-[var(--color-ink)] block">{session.name}</span>
+                  <span className="text-[10px] text-[var(--color-ink-3)] uppercase font-mono">{session.role.replace("_", " ")}</span>
+                </div>
+                <button
+                  id="header-logout-btn"
+                  onClick={handleLogout}
+                  title="Logout of current session"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--color-critical-tint)] hover:bg-[var(--color-critical)] text-[var(--color-critical)] hover:text-white border border-[var(--color-critical)]/30 rounded-[3px] text-xs font-semibold font-mono transition-all cursor-pointer shadow-sm"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setActiveScreen("login")}
+                  className="px-3 py-1.5 bg-[var(--color-paper)] hover:bg-[var(--color-surface-2)] text-[var(--color-navy)] border border-[var(--color-line)] rounded-[3px] text-xs font-semibold font-mono transition-all cursor-pointer"
+                >
+                  Sign In
+                </button>
+                <button
+                  onClick={() => setActiveScreen("request_access")}
+                  className="px-3 py-1.5 bg-[var(--color-navy)] hover:bg-[var(--color-navy-hover)] text-white rounded-[3px] text-xs font-semibold font-mono transition-all cursor-pointer"
+                >
+                  Request Access
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
+
+        <div className="p-6 md:p-8 max-w-7xl w-full mx-auto flex-1">
         
         {/* ==========================================
             SCREEN: LANDING / HOME PAGE
@@ -2588,6 +2640,28 @@ export default function App() {
                       />
                       <span>हिंदी (Hindi Translation)</span>
                     </label>
+                  </div>
+                </div>
+
+                {/* Active Session & Logout Security Section */}
+                <div className="pt-4 border-t border-[var(--color-line)]/60 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h4 className="text-xs font-semibold text-[var(--color-ink)] uppercase">Active Sovereign Session</h4>
+                      <p className="text-[10px] text-[var(--color-ink-3)] font-mono">Sign out to invalidate current nodal security tokens.</p>
+                    </div>
+                    {session.isLoggedIn ? (
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="px-4 py-2 bg-[var(--color-critical-tint)] hover:bg-[var(--color-critical)] text-[var(--color-critical)] hover:text-white border border-[var(--color-critical)]/30 rounded-[3px] text-xs font-semibold font-mono transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Logout of Mainframe</span>
+                      </button>
+                    ) : (
+                      <span className="text-[10px] font-mono text-[var(--color-ink-3)]">No Active Session</span>
+                    )}
                   </div>
                 </div>
 
