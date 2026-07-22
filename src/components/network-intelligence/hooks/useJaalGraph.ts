@@ -5,6 +5,7 @@ import {
   JaalNode,
   JaalGraphState
 } from "../../../types/jaal";
+import { getSyntheticGraph, simulateDisruption } from "../../../../server/jaal/graphEngine";
 
 interface UseJaalGraphReturn {
   isLoading: boolean;
@@ -52,43 +53,46 @@ export function useJaalGraph(onAddAuditLog?: (msg: string) => void): UseJaalGrap
     return graphState.nodes.filter((n) => n.isFrozen).map((n) => n.id);
   }, [graphState.nodes]);
 
-  // Fetch baseline graph from GET /api/jaal/graph
+  // Fetch baseline graph from GET /api/jaal/graph or fallback
   const fetchGraph = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    let json: JaalGraphResponse | null = null;
     try {
       const res = await fetch("/api/jaal/graph");
-      if (!res.ok) {
-        throw new Error(`Failed to fetch graph data: ${res.statusText}`);
+      if (res.ok) {
+        json = await res.json();
       }
-      const json: JaalGraphResponse = await res.json();
-      if (json.status === "success" && json.data) {
-        setGraphState({
-          summary: json.data.summary,
-          nodes: json.data.nodes,
-          edges: json.data.edges,
-          fraudRings: json.data.fraudRings,
-          recommendedTargets: json.data.recommendedTargets,
-          disruptionSummary: null
-        });
-
-        if (json.data.nodes.length > 0 && !selectedNodeId) {
-          setSelectedNodeId(json.data.nodes[0].id);
-        }
-
-        if (auditLogRef.current) {
-          auditLogRef.current("JAAL Engine: Loaded baseline synthetic network graph.");
-        }
-      } else {
-        throw new Error("Invalid response envelope returned by backend API");
-      }
-    } catch (err: any) {
-      console.error("Error fetching JAAL graph:", err);
-      setError(err.message || "Failed to load network intelligence graph");
-    } finally {
-      setIsLoading(false);
+    } catch (fErr) {
+      console.warn("JAAL API fetch error, utilizing fallback synthetic engine:", fErr);
     }
-  }, []); // Empty dependency array: fetchGraph reference NEVER changes
+
+    if (!json || json.status !== "success" || !json.data) {
+      json = getSyntheticGraph();
+    }
+
+    if (json && json.data) {
+      setGraphState({
+        summary: json.data.summary,
+        nodes: json.data.nodes,
+        edges: json.data.edges,
+        fraudRings: json.data.fraudRings,
+        recommendedTargets: json.data.recommendedTargets,
+        disruptionSummary: null
+      });
+
+      if (json.data.nodes.length > 0) {
+        setSelectedNodeId((prev) => prev || json!.data.nodes[0].id);
+      }
+
+      if (auditLogRef.current) {
+        auditLogRef.current("JAAL Engine: Loaded baseline synthetic network graph.");
+      }
+    } else {
+      setError("Failed to load network intelligence graph");
+    }
+    setIsLoading(false);
+  }, []);
 
   // RUN ONCE ON INITIAL MOUNT ONLY. No automatic re-fetching!
   useEffect(() => {
@@ -102,42 +106,44 @@ export function useJaalGraph(onAddAuditLog?: (msg: string) => void): UseJaalGrap
     }
   }, []);
 
-  // Execute node freeze via POST /api/jaal/disrupt and keep returned state persistently
+  // Execute node freeze via POST /api/jaal/disrupt with fallback
   const disruptNodes = useCallback(async (targetNodeIds: string[]) => {
     setIsLoading(true);
     setError(null);
+    let json: JaalDisruptionResponse | null = null;
     try {
       const res = await fetch("/api/jaal/disrupt", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ frozenNodeIds: targetNodeIds })
       });
-      if (!res.ok) {
-        throw new Error(`Failed to execute node disruption: ${res.statusText}`);
+      if (res.ok) {
+        json = await res.json();
       }
-      const json: JaalDisruptionResponse = await res.json();
-      if (json.status === "success" && json.data) {
-        // Update graphState permanently with response envelope
-        setGraphState((prev) => ({
-          ...prev,
-          nodes: json.data.nodes,
-          edges: json.data.edges,
-          summary: json.data.summary || prev.summary,
-          disruptionSummary: json.data.disruptionSummary
-        }));
-
-        if (auditLogRef.current) {
-          auditLogRef.current(`ENFORCEMENT MANDATE: Disruption executed against [${targetNodeIds.join(", ")}].`);
-        }
-      } else {
-        throw new Error("Disruption simulation API returned error status");
-      }
-    } catch (err: any) {
-      console.error("Error executing disruption simulation:", err);
-      setError(err.message || "Failed to execute disruption simulation");
-    } finally {
-      setIsLoading(false);
+    } catch (fErr) {
+      console.warn("JAAL disrupt API error, utilizing fallback simulation engine:", fErr);
     }
+
+    if (!json || json.status !== "success" || !json.data) {
+      json = simulateDisruption(targetNodeIds);
+    }
+
+    if (json && json.data) {
+      setGraphState((prev) => ({
+        ...prev,
+        nodes: json!.data.nodes,
+        edges: json!.data.edges,
+        summary: json!.data.summary || prev.summary,
+        disruptionSummary: json!.data.disruptionSummary
+      }));
+
+      if (auditLogRef.current) {
+        auditLogRef.current(`ENFORCEMENT MANDATE: Disruption executed against [${targetNodeIds.join(", ")}].`);
+      }
+    } else {
+      setError("Failed to execute disruption simulation");
+    }
+    setIsLoading(false);
   }, []);
 
   // MANUAL RESET ONLY: Triggered when user clicks "Reset Network" button
