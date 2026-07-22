@@ -536,26 +536,43 @@ app.post("/api/ai-assistant", async (req, res) => {
   // 1. If Gemini AI is active, run real Chat conversation
   if (ai) {
     try {
-      // Structure the messages for Gemini
-      const formattedHistory = messages.slice(0, -1).map((m: any) => ({
+      // Structure history for Gemini - ensure history starts with 'user' role
+      let historyItems = messages.slice(0, -1);
+      while (historyItems.length > 0 && historyItems[0].sender === "assistant") {
+        historyItems.shift();
+      }
+
+      const formattedHistory = historyItems.map((m: any) => ({
         role: m.sender === "user" ? ("user" as const) : ("model" as const),
         parts: [{ text: m.text }],
       }));
 
       const latestMessage = messages[messages.length - 1]?.text || "";
 
-      const chat = ai.chats.create({
-        model: "gemini-2.5-flash",
-        config: {
-          systemInstruction: `You are the CERT-In AI Cyber Security Assistant (SafeNet Specialist).
-Your purpose is to assist Indian citizens, police officers, bank representatives, and administrators with security guidelines, fraud investigation tactics, scam report protocols, and tech safety procedures (such as verifying UPI IDs, malicious APK analysis, fishing websites, and reporting under 1930 Cyber helpline).
-Keep your advice highly professional, clear, objective, and action-oriented. Maintain a helpful, calm, and sovereign tone. Mention official resources like cybercrime.gov.in and RBI guidelines when relevant.`,
-        },
-        history: formattedHistory,
-      });
+      let text = "";
+      const systemInstruction = `You are the CERT-In AI Cyber Security Assistant (SafeNet Specialist).
+Your purpose is to assist Indian citizens, police officers, bank representatives, and administrators with security guidelines, fraud investigation tactics, scam report protocols, and tech safety procedures (such as verifying UPI IDs, malicious APK analysis, phishing websites, and reporting under 1930 Cyber helpline).
+Keep your advice highly professional, clear, objective, concise, and action-oriented. Mention official resources like cybercrime.gov.in and RBI guidelines when relevant.`;
 
-      const response = await chat.sendMessage({ message: latestMessage });
-      const text = response.text;
+      try {
+        const chat = ai.chats.create({
+          model: "gemini-2.5-flash",
+          config: { systemInstruction },
+          history: formattedHistory,
+        });
+        const response = await chat.sendMessage({ message: latestMessage });
+        text = response.text || "";
+      } catch (err: any) {
+        console.warn("Primary gemini-2.5-flash chat busy/failed, attempting gemini-1.5-flash fallback:", err.message);
+        const chatFallback = ai.chats.create({
+          model: "gemini-1.5-flash",
+          config: { systemInstruction },
+          history: formattedHistory,
+        });
+        const responseFallback = await chatFallback.sendMessage({ message: latestMessage });
+        text = responseFallback.text || "";
+      }
+
       if (text) {
         return res.json({ text });
       }

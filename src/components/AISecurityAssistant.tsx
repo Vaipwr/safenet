@@ -195,9 +195,9 @@ export default function AISecurityAssistant() {
               key={msg.id}
               className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
             >
-              <div className={`max-w-[80%] rounded-[3px] p-3.5 text-xs leading-relaxed ${
+              <div className={`max-w-[80%] rounded-[3px] p-3.5 text-xs leading-relaxed whitespace-pre-wrap ${
                 msg.sender === "user"
-                  ? "bg-purple-600/20 border border-purple-500/30 text-[var(--color-ink)]"
+                  ? "bg-[var(--color-navy-tint)] border border-[var(--color-navy)]/30 text-[var(--color-ink)]"
                   : "bg-[var(--color-paper)] border border-[var(--color-line)] text-[var(--color-ink-2)]"
               }`}>
                 {msg.text}
