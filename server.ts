@@ -21,26 +21,25 @@ app.use(
 const PORT = 3000;
 
 // Initialize Gemini Client safely
-let ai: GoogleGenAI | null = null;
-const API_KEY = process.env.GEMINI_API_KEY;
-
-if (API_KEY && API_KEY !== "MY_GEMINI_API_KEY") {
+function getGeminiClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") return null;
   try {
-    ai = new GoogleGenAI({
-      apiKey: API_KEY,
+    return new GoogleGenAI({
+      apiKey,
       httpOptions: {
         headers: {
           "User-Agent": "aistudio-build",
         },
       },
     });
-    console.log("Gemini Client successfully initialized server-side.");
   } catch (error) {
     console.error("Failed to initialize Gemini client:", error);
+    return null;
   }
-} else {
-  console.log("GEMINI_API_KEY is not configured or placeholder. Running with simulated fallback analytics.");
 }
+
+let ai: GoogleGenAI | null = getGeminiClient();
 
 // ==========================================
 // NETRA — Currency CV backend (Python / FastAPI) integration
@@ -533,8 +532,9 @@ app.post("/api/ai-assistant", async (req, res) => {
     return res.status(400).json({ error: "Messages array is required" });
   }
 
-  // 1. If Gemini AI is active, run real Chat conversation
-  if (ai) {
+  // 1. If Gemini AI client is initialized, run real Chat conversation
+  const client = getGeminiClient() || ai;
+  if (client) {
     try {
       // Structure history for Gemini - ensure history starts with 'user' role
       let historyItems = messages.slice(0, -1);
@@ -555,7 +555,7 @@ Your purpose is to assist Indian citizens, police officers, bank representatives
 Keep your advice highly professional, clear, objective, concise, and action-oriented. Mention official resources like cybercrime.gov.in and RBI guidelines when relevant.`;
 
       try {
-        const chat = ai.chats.create({
+        const chat = client.chats.create({
           model: "gemini-2.5-flash",
           config: { systemInstruction },
           history: formattedHistory,
@@ -563,14 +563,23 @@ Keep your advice highly professional, clear, objective, concise, and action-orie
         const response = await chat.sendMessage({ message: latestMessage });
         text = response.text || "";
       } catch (err: any) {
-        console.warn("Primary gemini-2.5-flash chat busy/failed, attempting gemini-1.5-flash fallback:", err.message);
-        const chatFallback = ai.chats.create({
-          model: "gemini-1.5-flash",
-          config: { systemInstruction },
-          history: formattedHistory,
-        });
-        const responseFallback = await chatFallback.sendMessage({ message: latestMessage });
-        text = responseFallback.text || "";
+        console.warn("Primary gemini-2.5-flash chat failed, attempting direct generateContent fallback:", err.message);
+        try {
+          const response = await client.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: latestMessage,
+            config: { systemInstruction },
+          });
+          text = response.text || "";
+        } catch (genErr: any) {
+          console.warn("gemini-2.5-flash direct failed, attempting gemini-1.5-flash fallback:", genErr.message);
+          const responseFallback = await client.models.generateContent({
+            model: "gemini-1.5-flash",
+            contents: latestMessage,
+            config: { systemInstruction },
+          });
+          text = responseFallback.text || "";
+        }
       }
 
       if (text) {
@@ -701,7 +710,8 @@ Provide response in strict JSON:
 app.post("/api/analyze-multimodal", async (req, res) => {
   const { inputType, textData, imageBase64, mimeType, entityType, entityValue, language } = req.body;
 
-  if (ai) {
+  const client = getGeminiClient() || ai;
+  if (client) {
     try {
       const parts: any[] = [];
 
@@ -784,14 +794,14 @@ Identify scam classification, predict risk score (0-100), risk level (CRITICAL, 
 
       let resultResponse;
       try {
-        resultResponse = await ai.models.generateContent({
+        resultResponse = await client.models.generateContent({
           model: "gemini-2.5-flash",
           contents: parts,
           config: { responseMimeType: "application/json", responseSchema }
         });
       } catch (err: any) {
         console.warn("Multimodal primary model busy, attempting gemini-1.5-flash fallback:", err.message);
-        resultResponse = await ai.models.generateContent({
+        resultResponse = await client.models.generateContent({
           model: "gemini-1.5-flash",
           contents: parts,
           config: { responseMimeType: "application/json", responseSchema }
